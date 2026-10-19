@@ -252,7 +252,7 @@ def record_auth_failure(reason: str):
 # Structured Logging
 # ============================================================
 
-def configure_logging(level: str = "INFO", json_logs: bool = True) -> None:
+def configure_logging(level: str = "INFO", json_logs: bool = True, log_file: str = None) -> None:
     """Configure structlog for structured JSON logging."""
     timestamper = structlog.processors.TimeStamper(fmt="iso", utc=True)
     
@@ -284,7 +284,11 @@ def configure_logging(level: str = "INFO", json_logs: bool = True) -> None:
     
     # Configure stdlib logging
     import logging
-    handler = logging.StreamHandler(sys.stdout)
+    import os
+    handlers = [logging.StreamHandler(sys.stdout)]
+    if log_file:
+        os.makedirs(os.path.dirname(log_file) if os.path.dirname(log_file) else ".", exist_ok=True)
+        handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
     formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=shared_processors,
         processors=[
@@ -292,9 +296,10 @@ def configure_logging(level: str = "INFO", json_logs: bool = True) -> None:
             renderer,
         ],
     )
-    handler.setFormatter(formatter)
+    for h in handlers:
+        h.setFormatter(formatter)
     root_logger = logging.getLogger()
-    root_logger.handlers = [handler]
+    root_logger.handlers = handlers
     root_logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
 
@@ -503,7 +508,8 @@ def setup_observability(app, config: dict = None) -> None:
     # Logging
     log_level = cfg.get("log_level", "INFO")
     json_logs = cfg.get("json_logs", True)
-    configure_logging(log_level, json_logs)
+    log_file = cfg.get("logging_file", None)
+    configure_logging(log_level, json_logs, log_file=log_file)
     
     # Request ID middleware
     app.add_middleware(RequestIDMiddleware)

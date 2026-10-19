@@ -224,6 +224,7 @@ class Config:
     lifecycle: LifecycleCfg = field(default_factory=LifecycleCfg)
     observability: ObservabilityCfg = field(default_factory=ObservabilityCfg)
     logging_level: str = "INFO"
+    logging_file: str = ""
     # P1 覆盖层：被禁用的模型 {(provider, model)}
     disabled_models: set = field(default_factory=set)
     # P2 缓存容灾
@@ -265,6 +266,7 @@ def load_config(path: Path) -> Config:
         alias_show_count=bool(server.get("alias_show_count", True)),
         access_key=str(server.get("access_key", "") or ""),
         logging_level=raw.get("logging", {}).get("level", "INFO"),
+        logging_file=raw.get("logging", {}).get("file", ""),
     )
 
     # providers

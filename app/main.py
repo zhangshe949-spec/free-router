@@ -174,6 +174,7 @@ async def lifespan(app: FastAPI):
             "sampling_ratio": observability_cfg.sampling_ratio,
             "propagators": observability_cfg.propagators,
             "metric_export_interval": observability_cfg.metric_export_interval,
+            "logging_file": getattr(cfg, "logging_file", None),
         }
     )
     
