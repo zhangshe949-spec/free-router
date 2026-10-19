@@ -266,7 +266,7 @@ def load_config(path: Path) -> Config:
         alias_show_count=bool(server.get("alias_show_count", True)),
         access_key=str(server.get("access_key", "") or ""),
         logging_level=raw.get("logging", {}).get("level", "INFO"),
-        logging_file=raw.get("logging", {}).get("file", ""),
+        logging_file=str(path.parent.parent / raw.get("logging", {}).get("file", "")) if raw.get("logging", {}).get("file") else "",
     )
 
     # providers

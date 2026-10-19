@@ -511,8 +511,8 @@ def setup_observability(app, config: dict = None) -> None:
     log_file = cfg.get("logging_file", None)
     configure_logging(log_level, json_logs, log_file=log_file)
     
-    # Request ID middleware
-    app.add_middleware(RequestIDMiddleware)
+    # Request ID middleware (moved to module level in main.py to avoid
+    # "Cannot add middleware after an application has started" error)
     
     # OpenTelemetry
     otlp_endpoint = cfg.get("otlp_endpoint")

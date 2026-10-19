@@ -26,7 +26,7 @@ from .core.selector import parse_task_context
 from .core.cache import ResponseCache
 from .core.notify import Notifier
 from .core import metrics, overlay as overlay_mod
-from .core.observability import setup_observability, cache_span
+from .core.observability import setup_observability, cache_span, RequestIDMiddleware
 from .core.circuit_breaker import get_circuit_breaker_manager, CircuitBreakerConfig
 from .core.health_check import get_health_check_manager, HealthCheckConfig
 from .core.request_queue import get_request_queue, QueueConfig
@@ -263,6 +263,7 @@ class _PluginMiddleware:
 app = FastAPI(title="Free-Router", lifespan=lifespan)
 app.add_middleware(_PluginMiddleware)
 app.add_middleware(AuthMiddleware)
+app.add_middleware(RequestIDMiddleware)
 
 # Web 管理面板（静态单页）：http://127.0.0.1:8787/panel/
 _STATIC_DIR = Path(__file__).resolve().parent / "admin_ui"
