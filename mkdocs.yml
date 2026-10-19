@@ -1,0 +1,75 @@
+site_name: Free-Router
+site_description: 免费/收费大模型聚合路由网关（OpenAI 兼容）文档
+site_url: https://zhangshe949-spec.github.io/free-router/
+repo_url: https://github.com/zhangshe949-spec/free-router
+repo_name: free-router
+
+theme:
+  name: material
+  language: zh
+  custom_dir: docs/theme
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: 浅色
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: 深色
+
+extra_css:
+  - theme/stylesheets/extra.css
+
+extra_javascript:
+  - theme/javascripts/extra.js
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            heading_level: 2
+  - glightbox
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed
+  - pymdownx.details
+  - toc:
+      permalink: true
+
+nav:
+  - 首页: index.md
+  - 配置: configuration.md
+  - API 参考: api-reference.md
+  - 提供商: providers.md
+  - 可观测性: observability.md
+  - 插件: plugins.md
+  - 部署: deployment.md
+  - FAQ: faq.md
+  - 示例:
+      - Python: examples/python.md
+      - JavaScript: examples/javascript.md
+      - Go: examples/go.md

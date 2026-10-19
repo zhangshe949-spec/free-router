@@ -1,0 +1,25 @@
+# Free-Router 单服务编排：一键启动路由网关 + Web 管理面板（/panel）
+services:
+  free-router:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: free-router:latest
+    container_name: free-router
+    ports:
+      - "8787:8787"
+    volumes:
+      # 运行时数据（SQLite、日志）与配置持久化到宿主机
+      - ./data:/app/data
+      - ./config:/app/config
+    # 可选：存在 .env 时自动注入密钥；缺失也不报错
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

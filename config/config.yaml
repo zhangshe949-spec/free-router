@@ -1,0 +1,615 @@
+# Free-Router 配置示例
+# 兜底密钥来源：本目录 .env 优先，其次下列文件（避免同一套 key 多处维护）
+# 密钥兜底来源（按顺序叠加，先到先得）。相对路径相对仓库根目录。
+#   本目录 .env 优先；~/.free-router/.env 适合多实例共享；也可填任意绝对路径
+env_files:
+  - ~/.free-router/.env
+server:
+  host: 0.0.0.0
+  port: 8787
+  openai_base: /v1
+  # 对外只暴露一个聚合模型别名：智能体侧只看到 free-router，实际用哪个模型由本服务自动轮转
+  model_alias: free-router
+  expose_single_model: true       # false = 列出全部真实模型（仅调试用）
+  alias_show_count: true          # 别名后缀显示「(N 个模型轮转)」
+  access_key: ""                  # 可选网关访问密钥（WebSocket/批量端点鉴权；空=不鉴权）
+
+# 提供商池（免费/收费均可，用 type 区分）
+providers:
+  amd-radeon:
+    base_url: https://developer.amd.com.cn/radeon/api/v1
+    # 键名多候选：兼容常见的 RADEON_API_KEY 与本项目旧名 AMD_API_KEY
+    key_env: [RADEON_API_KEY, AMD_API_KEY]
+    api_key: ""                     # 或在此手动填写 rc-xxx 密钥（优先级高于 key_env）
+    request_timeout: 30
+    tier_quality: high
+    models:
+      - id: DeepSeek-V4-Flash
+        capability: {score: 78, code: 82, reason: 80, long: 70, vision: false}
+        tier: high
+        type: free                    # free | paid（免费池默认 free）
+        tags: [reasoning, code, long] # 能力标签：供任务感知选型打分
+        context_window: 131072
+        max_output_tokens: 8192
+        pricing_per_1k_tokens: {input: 0.0, output: 0.0}
+        supported_parameters: [temperature, top_p, max_tokens, tools]
+      - id: DeepSeek-V4-Flash-Vision-Exp
+        capability: {score: 79, code: 80, reason: 79, long: 72, vision: true}
+        tier: high
+      - id: Qwen3.8-Flash-Next
+        capability: {score: 70, code: 72, reason: 68, long: 66, vision: false}
+        tier: medium
+      - id: Qwen2.5-VL-72B
+        capability: {score: 72, code: 70, reason: 72, long: 60, vision: true}
+        tier: medium
+
+  modelscope:
+    base_url: https://api-inference.modelscope.cn/v1
+    key_env: [MODELSCOPE_API_KEY, HERMES_CUSTOM_MODELSCOPE_API_KEY]
+    api_key: ""                     # 或在此手动填写（三家工具各自独立 key）
+    request_timeout: 30
+    tier_quality: high
+    models:
+      - id: Qwen/Qwen3.8-Flash-Next
+        capability: {score: 70, code: 72, reason: 68, long: 66, vision: false}
+        tier: medium
+        context_window: 32768
+        max_output_tokens: 4096
+        pricing_per_1k_tokens: {input: 0.0, output: 0.0}
+        supported_parameters: [temperature, top_p, max_tokens]
+      - id: OpenGVLab/InternVL3_5-241B-A28B
+        capability: {score: 74, code: 70, reason: 74, long: 60, vision: true}
+        tier: medium
+
+  kilogw:
+    base_url: https://api.kilo.ai/api/openrouter
+    key_env: ""                     # 免 key
+    extra_headers:
+      Authorization: ''
+    request_timeout: 10
+    tier_quality: high
+    # 用户策略：自动池只收免费模型（:free 后缀 / kilo-auto/free）；
+    # 付费模型（claude/gpt 等）默认不进自动 fallback，仅在你显式指定时使用。
+    free_only: true
+    models:
+      - id: inclusionai/ling-3.0-flash-vl:free
+        capability: {score: 68, code: 66, reason: 66, long: 60, vision: true}
+        tier: medium
+        type: free
+        tags: [vision, chat]
+        context_window: 131072
+        max_output_tokens: 8192
+        pricing_per_1k_tokens: {input: 0.0, output: 0.0}
+        supported_parameters: [temperature, top_p, max_tokens, tools]
+
+  zen:                              # opencode Zen 匿名免费车道（免 key）
+    # 直接调用会被指纹闸门拒（"free tier can only be used from within OpenCode"）；
+    # app/providers/zen.py 负责补齐会话头 + 指纹工具 + 强制流式，等价于
+    # opencode2dsh / dsh-opencode-free-models 那类插件的做法，但不用装任何插件。
+    base_url: https://opencode.ai/zen/v1
+    key_env: ""                     # 免 key（适配器内部固定 Bearer public）
+    api_key: ""
+    request_timeout: 120            # 免费车道实测常 2~15s，长答案最慢约 60s
+    tier_quality: high
+    free_only: true
+    models:
+      # ⚠️ 2026-10 本机实测：以下 7 个可用；beam-free 地区受限(403)，
+      #    jev-1.13-free 只走 /responses 协议，故都不入池。
+      - id: deepseek-v4.1-flash-free
+        capability: {score: 78, code: 78, reason: 76, long: 80, vision: false}
+        tier: high
+        type: free
+        tags: [reasoning, code]
+      - id: glm-5.3-flash-free
+        capability: {score: 74, code: 72, reason: 74, long: 76, vision: false}
+        tier: high
+        type: free
+        tags: [chat, reasoning]
+      - id: mimo-v2.6-flash-free
+        capability: {score: 70, code: 70, reason: 68, long: 70, vision: false}
+        tier: medium
+        type: free
+        tags: [chat]
+      - id: nemotron-3.5-super-vl-free
+        capability: {score: 72, code: 68, reason: 72, long: 68, vision: true}
+        tier: high
+        type: free
+        tags: [vision, reasoning]
+      - id: nemotron-3.5-lightning-free
+        capability: {score: 64, code: 62, reason: 62, long: 64, vision: false}
+        tier: low
+        type: free
+        tags: [fast]
+      - id: longcat-2.5-preview-free
+        capability: {score: 70, code: 68, reason: 70, long: 78, vision: false}
+        tier: medium
+        type: free
+        tags: [long, chat]
+      - id: space-bunny-free
+        capability: {score: 62, code: 60, reason: 62, long: 62, vision: false}
+        tier: low
+        type: free
+        tags: [fast]
+
+  # ===== Phase 1 新增：7 家国内免费提供商（全部国内直连，无需代理）=====
+  # 安全约定：所有 api_key 保持 ""，密钥一律从 .env / 环境变量读取。
+  zhipu:                            # 智谱 GLM（中文强）
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    key_env: ZAI_API_KEY
+    api_key: ""
+    request_timeout: 30
+    tier_quality: high
+    models:
+      - id: glm-4-flash
+        capability: {score: 66, code: 68, reason: 66, long: 60, vision: false}
+        tier: medium
+      - id: glm-4.7-flash             # 128K 上下文，中文强
+        capability: {score: 70, code: 70, reason: 70, long: 78, vision: false}
+        tier: high
+        context_window: 131072
+        max_output_tokens: 4096
+        pricing_per_1k_tokens: {input: 0.0, output: 0.0}
+        supported_parameters: [temperature, top_p, max_tokens, tools]
+
+  siliconflow:                      # 硅基流动（9B 以下永久免费）
+    base_url: https://api.siliconflow.cn/v1
+    key_env: SILICONFLOW_API_KEY
+    api_key: ""
+    request_timeout: 30
+    tier_quality: medium
+    models:
+      - id: Qwen/Qwen2.5-7B-Instruct
+        capability: {score: 62, code: 60, reason: 62, long: 64, vision: false}
+        tier: medium
+      - id: THUDM/glm-4-9b-chat
+        capability: {score: 63, code: 62, reason: 62, long: 62, vision: false}
+        tier: medium
+      - id: Qwen/Qwen2.5-Coder-7B-Instruct
+        capability: {score: 63, code: 66, reason: 60, long: 62, vision: false}
+        tier: medium
+
+  qianfan:                          # 百度千帆（ernie-speed/lite 永久免费）
+    base_url: https://qianfan.baidubce.com/v2
+    key_env: QIANFAN_API_KEY
+    api_key: ""
+    request_timeout: 30
+    tier_quality: medium
+    models:
+      - id: ernie-speed-8k
+        capability: {score: 60, code: 58, reason: 60, long: 58, vision: false}
+        tier: medium
+      - id: ernie-lite-8k
+        capability: {score: 56, code: 54, reason: 56, long: 56, vision: false}
+        tier: medium
+
+  hunyuan:                          # 腾讯混元（hunyuan-lite 免费）
+    base_url: https://api.hunyuan.cloud.tencent.com/v1
+    key_env: HUNYUAN_API_KEY
+    api_key: ""
+    request_timeout: 30
+    tier_quality: medium
+    models:
+      - id: hunyuan-lite
+        capability: {score: 60, code: 60, reason: 62, long: 62, vision: false}
+        tier: medium
+
+  spark:                            # 讯飞星火（spark-lite 免费）
+    base_url: https://spark-api-open.xf-yun.com/v1
+    key_env: SPARK_API_KEY
+    api_key: ""
+    request_timeout: 30
+    tier_quality: medium
+    models:
+      - id: spark-lite
+        capability: {score: 58, code: 56, reason: 58, long: 56, vision: false}
+        tier: medium
+
+  dashscope:                        # 阿里云百炼（qwen-plus/turbo 每模型 100 万 token）
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    key_env: DASHSCOPE_API_KEY
+    api_key: ""
+    request_timeout: 30
+    tier_quality: high
+    models:
+      - id: qwen-plus
+        capability: {score: 72, code: 74, reason: 74, long: 80, vision: false}
+        tier: high
+      - id: qwen-turbo
+        capability: {score: 66, code: 66, reason: 66, long: 72, vision: false}
+        tier: medium
+
+  ark:                              # 火山方舟
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    key_env: ARK_API_KEY
+    api_key: ""
+    request_timeout: 30
+    tier_quality: high
+    # 已按本机账号实测：下列模型状态为「已开通」（其余返回 ModelNotOpen）。
+    # ⚠️ 火山不认模型别名，必须用带日期后缀的确切 model id（不是 ep 接入点也能直调）。
+    # ⚠️ 加入「协作奖励计划」才有每日 200 万 token 免费额度；未加入时调用会计费。
+    models:
+      - id: deepseek-v4-1-flash-260910
+        capability: {score: 78, code: 78, reason: 76, long: 80, vision: false}
+        tier: medium
+      - id: deepseek-v4-flash-ga-260731
+        capability: {score: 74, code: 74, reason: 72, long: 74, vision: false}
+        tier: medium
+      - id: deepseek-v4-pro-ga-260813
+        capability: {score: 84, code: 86, reason: 84, long: 78, vision: false}
+        tier: high
+        context_window: 131072
+        max_output_tokens: 8192
+        pricing_per_1k_tokens: {input: 0.0, output: 0.0}
+        supported_parameters: [temperature, top_p, max_tokens, tools]
+      - id: doubao-seed-2-1-pro-260915
+        capability: {score: 80, code: 74, reason: 78, long: 80, vision: true}
+        tier: high
+      - id: doubao-seed-evolving
+        capability: {score: 76, code: 74, reason: 76, long: 76, vision: false}
+        tier: medium
+      - id: glm-5-2-260617
+        capability: {score: 78, code: 76, reason: 78, long: 76, vision: false}
+        tier: high
+
+  # ===== Phase 2 新增：全球免费提供商（免 key / 免费层）=====
+  # 注意：这些提供商多为海外 API，国内直连可能不稳定，建议配合代理或本地代理网关使用。
+
+  openrouter:                       # OpenRouter 聚合网关（免费层 :free 后缀）
+    base_url: https://openrouter.ai/api/v1
+    key_env: OPENROUTER_API_KEY
+    api_key: ""
+    request_timeout: 60
+    tier_quality: high
+    free_only: true
+    models:
+      - id: deepseek/deepseek-r1:free
+        capability: {score: 85, code: 88, reason: 90, long: 80, vision: false}
+        tier: high
+        type: free
+        tags: [reasoning, code, long]
+        context_window: 131072
+        max_output_tokens: 8192
+        pricing_per_1k_tokens: {input: 0.0, output: 0.0}
+        supported_parameters: [temperature, top_p, max_tokens, tools]
+      - id: meta-llama/llama-3.3-70b-instruct:free
+        capability: {score: 78, code: 76, reason: 78, long: 80, vision: false}
+        tier: high
+        type: free
+        tags: [chat, reasoning]
+      - id: mistralai/mistral-small-3.1-24b-instruct:free
+        capability: {score: 72, code: 70, reason: 72, long: 76, vision: false}
+        tier: medium
+        type: free
+        tags: [chat, fast]
+      - id: google/gemini-2.0-flash-exp:free
+        capability: {score: 80, code: 78, reason: 80, long: 85, vision: true}
+        tier: high
+        type: free
+        tags: [vision, reasoning, long]
+      - id: qwen/qwen2.5-vl-72b-instruct:free
+        capability: {score: 76, code: 72, reason: 76, long: 72, vision: true}
+        tier: high
+        type: free
+        tags: [vision, chat]
+      - id: deepseek/deepseek-chat-v3-0324:free
+        capability: {score: 82, code: 84, reason: 82, long: 80, vision: false}
+        tier: high
+        type: free
+        tags: [code, reasoning]
+
+  groq:                             # Groq 超快推理（免费层 14,400 req/day）
+    base_url: https://api.groq.com/openai/v1
+    key_env: GROQ_API_KEY
+    api_key: ""
+    request_timeout: 30
+    tier_quality: high
+    free_only: true
+    models:
+      - id: llama-3.3-70b-versatile
+        capability: {score: 78, code: 76, reason: 78, long: 80, vision: false}
+        tier: high
+        type: free
+        tags: [chat, reasoning, fast]
+        context_window: 131072
+        max_output_tokens: 8192
+        pricing_per_1k_tokens: {input: 0.0, output: 0.0}
+        supported_parameters: [temperature, top_p, max_tokens, tools]
+      - id: llama-3.1-8b-instant
+        capability: {score: 68, code: 66, reason: 68, long: 70, vision: false}
+        tier: medium
+        type: free
+        tags: [fast, chat]
+      - id: gemma2-9b-it
+        capability: {score: 65, code: 63, reason: 65, long: 65, vision: false}
+        tier: medium
+        type: free
+        tags: [fast]
+      - id: mixtral-8x7b-32768
+        capability: {score: 70, code: 68, reason: 70, long: 72, vision: false}
+        tier: medium
+        type: free
+        tags: [chat, long]
+
+  cloudflare:                       # Cloudflare Workers AI（免费 10,000 neurons/day）
+    base_url: https://api.cloudflare.com/client/v4/accounts
+    key_env: CLOUDFLARE_ACCOUNT_ID
+    api_key: ""
+    request_timeout: 60
+    tier_quality: medium
+    free_only: true
+    extra_config:
+      account_id_env: CLOUDFLARE_ACCOUNT_ID
+    models:
+      - id: "@cf/meta/llama-3.1-8b-instruct"
+        capability: {score: 68, code: 66, reason: 68, long: 70, vision: false}
+        tier: medium
+        type: free
+        tags: [fast, chat]
+      - id: "@cf/mistral/mistral-7b-instruct-v0.1"
+        capability: {score: 66, code: 64, reason: 66, long: 68, vision: false}
+        tier: medium
+        type: free
+        tags: [fast]
+      - id: "@cf/google/gemma-7b-it"
+        capability: {score: 65, code: 63, reason: 65, long: 65, vision: false}
+        tier: medium
+        type: free
+        tags: [fast]
+
+  together:                         # Together AI（免费层部分模型）
+    base_url: https://api.together.xyz/v1
+    key_env: TOGETHER_API_KEY
+    api_key: ""
+    request_timeout: 60
+    tier_quality: high
+    models:
+      - id: meta-llama/Llama-3.3-70B-Instruct-Turbo-Free
+        capability: {score: 78, code: 76, reason: 78, long: 80, vision: false}
+        tier: high
+        type: free
+        tags: [chat, reasoning]
+        context_window: 131072
+        max_output_tokens: 8192
+        pricing_per_1k_tokens: {input: 0.0, output: 0.0}
+        supported_parameters: [temperature, top_p, max_tokens, tools]
+      - id: mistralai/Mixtral-8x7B-Instruct-v0.1
+        capability: {score: 70, code: 68, reason: 70, long: 72, vision: false}
+        tier: medium
+        type: free
+        tags: [chat, long]
+      - id: Qwen/Qwen2.5-72B-Instruct-Turbo
+        capability: {score: 74, code: 72, reason: 74, long: 78, vision: false}
+        tier: high
+        type: free
+        tags: [chat, reasoning, long]
+
+  deepinfra:                        # DeepInfra（部分免费模型）
+    base_url: https://api.deepinfra.com/v1/openai
+    key_env: DEEPINFRA_API_KEY
+    api_key: ""
+    request_timeout: 60
+    tier_quality: high
+    models:
+      - id: meta-llama/Llama-3.3-70B-Instruct
+        capability: {score: 78, code: 76, reason: 78, long: 80, vision: false}
+        tier: high
+        type: free
+        tags: [chat, reasoning]
+        context_window: 131072
+        max_output_tokens: 8192
+        pricing_per_1k_tokens: {input: 0.0, output: 0.0}
+        supported_parameters: [temperature, top_p, max_tokens, tools]
+      - id: microsoft/WizardLM-2-8x22B
+        capability: {score: 76, code: 74, reason: 76, long: 78, vision: false}
+        tier: high
+        type: free
+        tags: [chat, reasoning, long]
+      - id: Qwen/Qwen2.5-Coder-32B-Instruct
+        capability: {score: 72, code: 78, reason: 70, long: 72, vision: false}
+        tier: high
+        type: free
+        tags: [code, chat]
+
+# 路由
+router:
+  max_retries: 20
+  use_selector: true              # 任务感知选型（免费/收费 + 标签 + 质量分级）
+  # 可插拔打分策略（留空=内置算法）。自定义示例：
+  # policy:
+  #   module: my_pkg.my_policies
+  #   class: WeightedPolicy
+  #   args: {weight_code: 2.0}
+  sticky_ttl_seconds: 1800        # 30分钟粘性窗口
+  prefer_vision_for_unknown: true # 未知任务若图片则偏视觉模型
+  provider_order: [amd-radeon, zen, modelscope, kilogw, zhipu, siliconflow, qianfan, hunyuan, spark, dashscope, ark]  # 回退链（本地已移除）
+
+# 额度监控
+quota:
+  rpm_limit: 60
+  rpd_limit: 1000
+  tpm_limit: 200000
+  tpd_limit: 5000000
+  # 轮转时长：429 只短暂隔离，尽快让恢复的模型回到候选（不长时间空等）
+  cooldown_429: 30
+  cooldown_429_escalate: [60, 300]
+  cooldown_5xx: 20
+  cooldown_persist_db: true
+  # 额度预测：按近期速率预估「还能撑多久」，低于阈值就提前换别的模型（自愈）
+  predict_window_seconds: 30
+  predict_threshold_seconds: 20
+  # 内部守护巡检：每 15s 释放已到期冷却；冷却比例超阈值自动重新发现
+  recovery_check_seconds: 15
+  cooled_ratio_trigger: 0.6
+  probe_stale_seconds: 300
+
+# 生命周期
+lifecycle:
+  refresh_interval_hours: 12
+  enable_discovery: true
+  discovery_urls:
+    amd-radeon: https://developer.amd.com.cn/radeon/api/v1/models
+    modelscope: https://api-inference.modelscope.cn/v1/models
+    kilogw: https://api.kilo.ai/api/openrouter/models
+    # Phase 1 新增（部分需 key；失败由 lifecycle try/except 容错）
+    zhipu: https://open.bigmodel.cn/api/paas/v4/models
+    siliconflow: https://api.siliconflow.cn/v1/models
+    qianfan: https://qianfan.baidubce.com/v2/models
+    hunyuan: https://api.hunyuan.cloud.tencent.com/v1/models
+    spark: https://spark-api-open.xf-yun.com/v1/models
+    dashscope: https://dashscope.aliyuncs.com/compatible-mode/v1/models
+    # ark 不放进自动发现：它的 /models 混有图像/视频/3D 生成模型，
+    # 自动加会把非对话模型灌进候选池。对话模型改为在 providers.ark.models 手工维护。
+
+# ===== Autofree 自动调度（P10）=====
+# 用户选 model: "autofree" 即可：自动调度最强免费模型、前 10 耗尽顺延、恢复即切回
+autofree:
+  enabled: true
+  top_n: 10                    # 核心榜单数量
+  fallback_n: 10               # 兜底榜单数量（第 11~20 名）
+  recompute_interval_hours: 1  # 榜单重算间隔
+  sticky_ttl_seconds: 60       # 会话粘性 TTL（自动模式建议短，快速感知恢复）
+  max_retries: 30              # 最大重试次数（比标准模式大，覆盖更多模型）
+  min_runtime_requests: 5      # 运行时统计生效门槛（<5 次仅用静态评分）
+
+# ===== Smart-Free 智能路由（P11）=====
+# 用户选 model: "smart-free" 即可：自动识别任务类型 → 匹配最优免费模型 →
+# 负载均衡调度 → 跨 16 家提供商配额池管理 → 预测性轮转 → 无限 token 畅聊
+smart_free:
+  enabled: true
+  load_balance_strategy: weighted_round_robin  # round_robin | weighted_round_robin | least_connections | health_first
+  sticky_ttl_seconds: 300        # 会话粘性 TTL（智能模式建议 5 分钟）
+  max_retries: 50                # 最大重试次数（跨 16 家提供商，需要更多重试）
+  min_runtime_requests: 5        # 运行时统计生效门槛
+
+# ===== 可持续性管理器 =====
+# 跨提供商配额池管理、健康评分、预测性轮转
+sustainability:
+  enabled: true
+  global_quota_threshold: 0.15   # 全局剩余额度低于 15% 时触发告警
+  health_check_interval: 60      # 健康检查间隔（秒）
+  auto_failover: true            # 自动故障转移
+  learning_enabled: true         # 启用学习型路由（根据历史成功率动态调整）
+
+# 日志
+logging:
+  level: INFO
+  file: data/free_router.log
+
+# ---------------- 响应缓存 / 离线容灾（P2）----------------
+# 全部模型都不可用时，用最近一次成功响应兜底，保证任务不中断；
+# serve_hits=true 则命中即直接返回（省额度，但可能返回过期内容，默认关闭）。
+cache:
+  enabled: true
+  ttl_seconds: 86400
+  max_entries: 2000
+  serve_hits: false
+
+# ---------------- 指标（P5）----------------
+# GET /metrics（Prometheus 文本格式，零依赖）
+metrics:
+  enabled: true
+
+# ---------------- 错误告警（P6，默认关闭）----------------
+# 近 window_seconds 内错误率超过阈值 → webhook/SMTP 告警；
+# fallback_to_paid=true 时可在告警期临时把 type: paid 的模型提前。
+alerter:
+  enabled: false
+  type: webhook              # webhook | smtp | none
+  webhook_url: ""
+  smtp_host: ""
+  smtp_port: 587
+  smtp_user: ""
+  smtp_password: ""
+  smtp_from: ""
+  smtp_to: []
+  error_rate_threshold: 0.3
+  window_seconds: 300
+  min_interval_seconds: 600
+  fallback_to_paid: false
+
+# ---------------- 可观测性（Observability）----------------
+# 结构化日志、链路追踪、指标、健康检查、熔断器、请求队列
+observability:
+  log_level: INFO
+  json_logs: true
+  service_name: free-router
+  otlp_endpoint: ""          # 如: http://jaeger:4317
+  console_export: false
+  otlp_headers: {}            # OTLP 额外头（如鉴权 Authorization）
+  sampling_ratio: 1.0         # 采样率 0~1
+  propagators: [tracecontext, baggage]
+  metric_export_interval: 60  # 指标导出间隔（秒）
+  # 指标
+  metrics_enabled: true
+  metrics_port: 9090
+  # 健康检查
+  health_check_enabled: true
+  health_check_interval_seconds: 30.0
+  health_check_timeout_seconds: 5.0
+  # 熔断器
+  circuit_breaker_enabled: true
+  circuit_breaker_failure_threshold: 0.5
+  circuit_breaker_success_threshold: 3
+  circuit_breaker_window_size: 100
+  circuit_breaker_window_time: 60.0
+  # 请求队列（背压）
+  queue_enabled: true
+  queue_max_size: 50
+  queue_max_wait_time: 30.0
+
+# ---------------- 收费模型接入示例（P0，密钥一律留空）----------------
+# 与免费模型放在同一个 providers 池里，用 type: paid 区分：
+#   * 默认（prefer_free=true）不会被自动选中；
+#   * 请求里显式指定 model、或 free_router.prefer_free=false 时才会用；
+#   * 一旦使用，响应头会带 X-Free-Router-Model-Type: paid 与提醒文案。
+#
+# paid-example:
+#   base_url: https://api.deepseek.com/v1
+#   key_env: DEEPSEEK_API_KEY
+#   api_key: ""              # 手动填写或放 .env，绝不写死在仓库里
+#   type: paid
+#   request_timeout: 60
+#   tier_quality: high
+#   models:
+#     - id: deepseek-chat
+#       capability: {score: 82, code: 84, reason: 82, long: 80, vision: false}
+#       tier: high
+#       type: paid
+#       tags: [reasoning, code]
+
+# ---------------- 插件框架（P9）----------------
+# 启动时动态加载（module.class 实例化，config 透传给插件构造器）。
+# 内置示例见 app/plugins/builtin.py：
+#   * RequestLoggerPlugin       结构化日志请求/响应
+#   * ResponseTransformerPlugin 响应变换（如去除思考链 reasoning_content / thinking）
+plugins:
+  - name: request-logger
+    module: app.plugins.builtin
+    class: RequestLoggerPlugin
+    config: {}
+  - name: response-transformer
+    module: app.plugins.builtin
+    class: ResponseTransformerPlugin
+    config:
+      strip_keys: [reasoning_content, thinking, reasoning]
+
+# ---------------- 鉴权（P9）----------------
+# API Key / JWT / RBAC。api_keys 留空且 server.access_key 为空 = 不鉴权。
+auth:
+  api_keys: []
+    # - key: "sk-xxx"
+    #   tenant: default
+    #   scopes: [chat, batch, ws]       # chat / batch / ws / admin / read
+    #   roles: [user]
+    #   rate_limit: {rpm: 60, rpd: 1000}
+    #   models_allowlist: []
+    #   models_denylist: []
+  jwt: {}
+    # issuer: ""
+    # audience: ""
+    # jwks_url: ""
+    # algorithm: RS256
+  rbac:
+    admin: ["*"]
+    user: [chat, batch, ws]
+    viewer: [read]

@@ -1,0 +1,25 @@
+# 运行时数据（用卷挂载，不烘焙进镜像）
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+*.log
+
+# 版本控制与编辑器
+.git
+.gitignore
+.github
+
+# Python 缓存与虚拟环境
+__pycache__
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.venv
+venv
+
+# 密钥（绝不进镜像）
+.env
+.env.*
+
+# 文档（不参与运行）
+docs

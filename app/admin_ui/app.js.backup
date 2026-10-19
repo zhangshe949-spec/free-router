@@ -1,0 +1,1114 @@
+/**
+ * free-router 控制台 — 单页瀑布流应用逻辑
+ * 赛博朋克风格，全功能内联，无侧边栏
+ */
+
+console.log('[free-router] app.js loaded');
+
+const API_BASE = '/admin';
+
+// ============ 状态管理 ============
+const state = {
+  dashboard: {},
+  models: [],
+  providers: [],
+  quota: {},
+  cooldowns: {},
+  cache: {},
+  policy: {},
+  settings: {},
+  theme: localStorage.getItem('theme') || 'dark',
+  currentView: 'table',
+  modelFilters: { search: '', type: '', provider: '', capability: '' },
+  modelSortBy: 'favorite',
+  favorites: new Set(JSON.parse(localStorage.getItem('fr_favorites') || '[]')),
+  providerSections: {}, // 折叠状态
+  _cache: new Map(),
+  _cacheTTL: 5000,
+};
+
+// 提供商元数据：中文名、说明、免费额度规则、是否需代理、认证方式
+const PROVIDER_META = {
+  'amd-radeon': { 
+    nameCn: 'AMD Radeon', nameEn: 'AMD Radeon',
+    desc: 'AMD官方免费推理API，需注册开发者账号获取rc-xxx密钥',
+    freeQuota: '每日额度较高，速率限制宽松，RPM~60',
+    recovery: '额度实时恢复，无固定重置时间',
+    needProxy: false,
+    auth: '开发者门户注册，获取rc-xxx API Key',
+    payment: '完全免费',
+  },
+  'modelscope': { 
+    nameCn: '魔搭社区', nameEn: 'ModelScope',
+    desc: '阿里云魔搭社区推理服务，支持大量开源模型',
+    freeQuota: '免费模型调用，日额度视模型而定',
+    recovery: '每日0点重置',
+    needProxy: false,
+    auth: 'ModelScope账号登录，获取Access Token',
+    payment: '免费模型永久免费，付费模型按量计费',
+  },
+  'kilogw': { 
+    nameCn: 'Kilo Code', nameEn: 'Kilo Code',
+    desc: 'Kilo Code聚合网关，免Key匿名访问，支持免费模型池',
+    freeQuota: '仅限:free后缀模型，日额度不限',
+    recovery: '无额度限制',
+    needProxy: false,
+    auth: '免Key，匿名访问（Authorization留空）',
+    payment: '仅免费模型',
+  },
+  'zhipu': { 
+    nameCn: '智谱 GLM', nameEn: 'Zhipu GLM',
+    desc: '智谱AI开放平台，中文能力强，GLM-4系列免费',
+    freeQuota: 'glm-4-flash/glm-4.7-flash永久免费，每日大额度',
+    recovery: '每日0点重置',
+    needProxy: false,
+    auth: '智谱开放平台注册，获取ZAI_API_KEY',
+    payment: '免费模型永久免费，高阶模型按量计费',
+  },
+  'siliconflow': { 
+    nameCn: '硅基流动', nameEn: 'SiliconFlow',
+    desc: '硅基流动推理平台，9B以下模型永久免费',
+    freeQuota: '9B以下模型无限量免费，大模型有免费额度',
+    recovery: '每日0点重置',
+    needProxy: false,
+    auth: '硅基流动控制台获取API Key',
+    payment: '小模型永久免费，大模型按Token计费',
+  },
+  'qianfan': { 
+    nameCn: '百度千帆', nameEn: 'Baidu Qianfan',
+    desc: '百度千帆大模型平台，ernie-speed/lite永久免费',
+    freeQuota: 'ernie-speed-8k/ernie-lite-8k永久免费',
+    recovery: '每日0点重置',
+    needProxy: false,
+    auth: '百度智能云控制台获取API Key',
+    payment: '免费模型永久免费，专业版按量计费',
+  },
+  'hunyuan': { 
+    nameCn: '腾讯混元', nameEn: 'Tencent Hunyuan',
+    desc: '腾讯混元大模型平台，hunyuan-lite免费',
+    freeQuota: 'hunyuan-lite永久免费，日额度充足',
+    recovery: '每日0点重置',
+    needProxy: false,
+    auth: '腾讯云控制台获取HUNYUAN_API_KEY',
+    payment: '免费模型永久免费，专业版按量计费',
+  },
+  'spark': { 
+    nameCn: '讯飞星火', nameEn: 'iFlytek Spark',
+    desc: '科大讯飞星火大模型，spark-lite免费',
+    freeQuota: 'spark-lite永久免费，日额度充足',
+    recovery: '每日0点重置',
+    needProxy: false,
+    auth: '讯飞开放平台获取SPARK_API_KEY',
+    payment: '免费模型永久免费，专业版按量计费',
+  },
+  'dashscope': { 
+    nameCn: '阿里百炼', nameEn: 'Alibaba DashScope',
+    desc: '阿里云百炼平台，qwen-plus/turbo每模型100万token免费',
+    freeQuota: '每模型100万token免费额度，用完计费',
+    recovery: '额度不自动恢复，需人工充值或申请',
+    needProxy: false,
+    auth: '阿里云百炼控制台获取DASHSCOPE_API_KEY',
+    payment: '免费额度用完后按Token计费',
+  },
+  'ark': { 
+    nameCn: '火山方舟', nameEn: 'VolcEngine Ark',
+    desc: '字节跳动火山方舟，需加入「协作奖励计划」获免费额度',
+    freeQuota: '加入计划后每日200万token免费，否则按量计费',
+    recovery: '每日0点重置（需加入计划）',
+    needProxy: false,
+    auth: '火山方舟控制台获取ARK_API_KEY，需加入协作奖励计划',
+    payment: '未加入计划全量计费，加入后每日免费额度',
+  },
+};
+
+// ============ 工具函数 ============
+function $(sel, ctx = document) { return ctx.querySelector(sel); }
+function $$(sel, ctx = document) { return [...ctx.querySelectorAll(sel)]; }
+
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => {
+    if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === 'class') e.className = v;
+    else if (k === 'style') {
+      // 仅复制字符串键，避免数字索引导致 "Indexed property setter is not supported"
+      if (v && typeof v === 'object') {
+        Object.entries(v).forEach(([sk, sv]) => {
+          if (isNaN(sk)) e.style[sk] = sv;
+        });
+      }
+    } else e.setAttribute(k, v);
+  });
+  const flat = (arr) => arr.flatMap(c => Array.isArray(c) ? flat(c) : c);
+  flat(children).forEach(c => e.append(c instanceof Node ? c : document.createTextNode(String(c))));
+  return e;
+}
+
+function showToast(msg, type = 'success', duration = 5000) {
+  console.log('[free-router] Toast:', msg, type);
+  const layer = $('#toastLayer');
+  if (!layer) return;
+  const toast = el('div', { class: `toast ${type}` }, [
+    el('span', { class: 'toast-icon' }, type === 'success' ? '✅' : type === 'danger' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'),
+    el('span', { class: 'toast-message' }, msg),
+    el('button', { class: 'toast-close', onclick: () => toast.remove() }, '✕')
+  ]);
+  layer.appendChild(toast);
+  setTimeout(() => toast.remove(), duration);
+}
+
+function showModal(content) {
+  console.log('[free-router] Show modal');
+  const layer = $('#modalLayer');
+  const wrapper = $('#modalWrapper');
+  if (!layer || !wrapper) { console.warn('Modal elements not found'); return; }
+  wrapper.innerHTML = '';
+  wrapper.appendChild(content);
+  layer.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function hideModal() {
+  const layer = $('#modalLayer');
+  const wrapper = $('#modalWrapper');
+  if (!layer || !wrapper) return;
+  layer.hidden = true;
+  wrapper.innerHTML = '';
+  document.body.style.overflow = '';
+}
+
+function debounce(fn, ms = 300) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+function formatDuration(sec) {
+  if (sec >= 1e9) return '永久';
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.round(sec/60)}m`;
+  if (sec < 86400) return `${Math.round(sec/3600)}h`;
+  return `${Math.round(sec/86400)}d`;
+}
+
+function getTierStars(tier) {
+  const map = { high: '★★★', medium: '★★☆', low: '★☆☆' };
+  return map[tier] || '☆☆☆';
+}
+
+// 折叠面板切换
+function toggleProviderSection(id) {
+  const content = $('#' + id);
+  const toggle = document.querySelector(`[onclick="toggleProviderSection('${id}')"] .provider-section-toggle`);
+  if (!content) return;
+  const isOpen = content.style.display !== 'none';
+  content.style.display = isOpen ? 'none' : 'block';
+  if (toggle) toggle.textContent = isOpen ? '▶' : '▼';
+}
+
+// 滚动辅助
+function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function scrollToBottom() { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }
+
+// 初始化滚动按钮
+function initScrollButtons() {
+  if ($('#scrollTopBtn')) return; // 已存在
+  const btnTop = el('button', { class: 'scroll-btn scroll-top', id: 'scrollTopBtn', onclick: scrollToTop, title: '回到顶部' }, '⬆');
+  const btnBottom = el('button', { class: 'scroll-btn scroll-bottom', id: 'scrollBottomBtn', onclick: scrollToBottom, title: '跳到底部' }, '⬇');
+  document.body.appendChild(btnTop);
+  document.body.appendChild(btnBottom);
+  
+  // 滚动时显示/隐藏 - 使用 CSS class
+  window.addEventListener('scroll', () => {
+    const st = window.scrollY;
+    btnTop.classList.toggle('visible', st > 200);
+    btnBottom.classList.toggle('visible', st < document.body.scrollHeight - window.innerHeight - 200);
+  });
+}
+
+function getTagClass(tag) {
+  const t = tag.toLowerCase();
+  if (['vision', 'vl', 'visual', 'image'].includes(t)) return 'vision';
+  if (['reasoning', 'reason', 'think', 'cot'].includes(t)) return 'reasoning';
+  if (['code', 'coding', 'program'].includes(t)) return 'code';
+  if (['long', 'context', '32k', '128k', '200k'].includes(t)) return 'long';
+  return '';
+}
+
+// ============ API 请求封装 ============
+async function api(path, options = {}) {
+  const url = `${API_BASE}${path}`;
+  const opts = {
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options,
+  };
+  if (options.body && typeof options.body === 'object') opts.body = JSON.stringify(options.body);
+  try {
+    const res = await fetch(url, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return res.json();
+  } catch (e) {
+    console.error(`API ${path} 失败:`, e);
+    throw e;
+  }
+}
+
+async function apiCached(path, ttl = 5000) {
+  const now = Date.now();
+  const cached = state._cache.get(path);
+  if (cached && now - cached.time < ttl) return cached.data;
+  const data = await api(path);
+  state._cache.set(path, { data, time: now });
+  return data;
+}
+
+function invalidateCache(path) { state._cache.delete(path); }
+
+// ============ 数据加载 ============
+async function loadDashboard() {
+  console.log('[free-router] Loading dashboard...');
+  state.dashboard = await apiCached('/status');
+  console.log('[free-router] Dashboard loaded:', state.dashboard.models?.total, 'models');
+  console.log('[free-router] by_provider:', state.dashboard.models?.by_provider);
+  if (state.dashboard.models?.by_provider) {
+    state.providers = Object.entries(state.dashboard.models.by_provider)
+      .map(([provider, count]) => ({ provider, modelCount: count }));
+    console.log('[free-router] state.providers set to:', state.providers);
+  }
+  state.quota = state.dashboard.quota || {};
+  state.cooldowns = state.dashboard.cooldowns || {};
+  state.cache = state.dashboard.cache || {};
+  state.policy = state.dashboard.policy || {};
+  state.settings = state.dashboard.config || {};
+  $('#lastUpdate').textContent = '刚刚更新';
+}
+
+async function loadModels() {
+  console.log('[free-router] Loading models...');
+  const res = await apiCached('/models');
+  state.models = res.models || [];
+  console.log('[free-router] Models loaded:', state.models.length);
+  // 更新提供商筛选选项
+  updateProviderFilter();
+}
+
+async function loadPolicy() {
+  state.policy = await apiCached('/policy');
+}
+
+async function loadCache() {
+  state.cache = await apiCached('/cache');
+}
+
+function updateProviderFilter() {
+  const select = $('#modelFilterProvider');
+  if (!select) return;
+  const providers = [...new Set(state.models.map(m => m.provider))].sort();
+  select.innerHTML = '<option value="">全部提供商</option>' +
+    providers.map(p => `<option value="${p}">${p}</option>`).join('');
+}
+
+// ============ 渲染入口 ============
+function renderAll() {
+  console.log('[free-router] Rendering all sections');
+  renderOverview();
+  renderModels();
+  renderProviders();
+  renderQuota();
+  renderCooldown();
+  renderCache();
+  renderPolicy();
+  renderSettings();
+  initParticles();
+  initViewToggle();
+}
+
+function initViewToggle() {
+  $$('.view-toggle [role="tab"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('.view-toggle [role="tab"]').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+      state.currentView = btn.dataset.view;
+      renderModelsView();
+    });
+  });
+}
+
+// ============ Section 1: 系统概览 ============
+function renderOverview() {
+  const d = state.dashboard;
+  const m = d.models || {};
+  const q = d.quota || {};
+  const c = d.cooldowns || {};
+
+  // 指标卡片
+  const grid = $('#metricGrid');
+  if (grid) {
+    const kpis = [
+      { label: '模型总数', value: m.total || 0, icon: '🤖', class: 'cyan' },
+      { label: '活跃模型', value: m.active || 0, icon: '✅', class: 'green' },
+      { label: '免费模型', value: m.by_type?.free || 0, icon: '🆓', class: 'cyan' },
+      { label: '付费模型', value: m.by_type?.paid || 0, icon: '💰', class: 'amber' },
+      { label: '提供商数', value: Object.keys(m.by_provider || {}).length, icon: '🏢', class: 'violet' },
+      { label: '冷却中', value: Object.keys(c).length || 0, icon: '❄️', class: 'red' },
+    ];
+    grid.innerHTML = '';
+    kpis.forEach(k => grid.appendChild(el('div', { class: 'metric-card' }, [
+      el('div', { class: `metric-icon ${k.class}` }, k.icon),
+      el('div', { class: 'metric-value' }, k.value),
+      el('div', { class: 'metric-label' }, k.label),
+    ])));
+  }
+
+  // 图表
+  if (m.by_provider) initProviderChart(m.by_provider);
+  if (q.usage) initQuotaChart(q.usage);
+}
+
+function initProviderChart(data) {
+  const dom = $('#cProvider'); if (!dom) return;
+  if (!window._echartsLoaded) { console.warn('ECharts 未加载，跳过图表渲染'); return; }
+  if (dom._chart) { dom._chart.dispose(); }
+  const chart = echarts.init(dom); dom._chart = chart;
+  const providers = Object.keys(data);
+  const colors = { 'amd-radeon': '#ff6b6b', 'modelscope': '#4ecdc4', 'kilogw': '#45b7d1', 'zhipu': '#96ceb4', 'siliconflow': '#ffa502', 'qianfan': '#feca57', 'hunyuan': '#ff9ff3', 'spark': '#54a0ff', 'dashscope': '#5f27cd', 'ark': '#00c9a7' };
+  const option = {
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)', backgroundColor: 'rgba(10,15,26,.9)', borderColor: '#22d3ee', borderWidth: 1 },
+    legend: { orient: 'vertical', left: 'left', top: 'middle', data: providers, textStyle: { color: '#94a3b8', fontSize: 12 } },
+    series: [
+      {
+        name: '模型数',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 8, borderColor: '#030712', borderWidth: 2 },
+        label: { show: false },
+        emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+        labelLine: { show: false },
+        data: providers.map(p => ({ value: data[p], name: p, itemStyle: { color: colors[p] || '#64748b' } }))
+      }
+    ]
+  };
+  chart.setOption(option);
+  window.addEventListener('resize', () => chart.resize());
+}
+
+function initQuotaChart(data) {
+  const dom = $('#cQuota'); if (!dom) return;
+  if (!window._echartsLoaded) { console.warn('ECharts 未加载，跳过图表渲染'); return; }
+  if (dom._chart) { dom._chart.dispose(); }
+  const chart = echarts.init(dom); dom._chart = chart;
+  const entries = Object.entries(data).map(([k, v]) => ({ model: k, rpd: v.rpd || 0, rpm: v.rpm || 0, tpd: v.tpd || 0 })).sort((a, b) => b.rpd - a.rpd).slice(0, 10);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: 'rgba(10,15,26,.9)', borderColor: '#22d3ee', borderWidth: 1 },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'value', axisLabel: { color: '#94a3b8' }, axisLine: { show: false }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { type: 'category', data: entries.map(e => e.model.split('/').pop()), axisLabel: { color: '#94a3b8', interval: 0 }, axisLine: { show: false }, splitLine: { show: false } },
+    series: [{ name: '日请求数', type: 'bar', barWidth: '60%', itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#06b6d4' }, { offset: 1, color: '#a855f7' }] } }, data: entries.map(e => e.rpd) }]
+  };
+  chart.setOption(option);
+  window.addEventListener('resize', () => chart.resize());
+}
+
+// ============ Section 2: 模型矩阵 ============
+function renderModels() {
+  // 绑定搜索筛选
+  $('#modelSearch')?.addEventListener('input', debounce(() => { state.modelFilters.search = $('#modelSearch').value; renderModelsView(); }, 300));
+  $('#modelFilterType')?.addEventListener('change', () => { state.modelFilters.type = $('#modelFilterType').value; renderModelsView(); });
+  $('#modelFilterProvider')?.addEventListener('change', () => { state.modelFilters.provider = $('#modelFilterProvider').value; renderModelsView(); });
+  $('#modelFilterCapability')?.addEventListener('change', () => { state.modelFilters.capability = $('#modelFilterCapability').value; renderModelsView(); });
+  $('#modelSortBy')?.addEventListener('change', () => { state.modelSortBy = $('#modelSortBy').value; renderModelsView(); });
+  $('#btnAddModel')?.addEventListener('click', showAddModelModal);
+  
+  // 填充提供商下拉
+  const provSelect = $('#modelFilterProvider');
+  if (provSelect && state.providers.length) {
+    state.providers.forEach(p => {
+      if (![...provSelect.options].some(o => o.value === p)) {
+        provSelect.appendChild(el('option', { value: p }, p));
+      }
+    });
+  }
+  
+  // 更新元信息
+  updateModelsMeta();
+  
+  renderModelsView();
+}
+
+function getFilteredModels() {
+  const { search, type, provider, capability } = state.modelFilters;
+  const showDisabled = false;
+  return state.models.filter(m => {
+    if (!showDisabled && m.disabled) return false;
+    if (type && m.type !== type) return false;
+    if (provider && m.provider !== provider) return false;
+    if (capability && !(m.tags || []).some(t => t.toLowerCase().includes(capability.toLowerCase()))) return false;
+    if (search) {
+      const hay = `${m.provider} ${m.model} ${(m.tags || []).join(' ')}`.toLowerCase();
+      if (!hay.includes(search.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
+function sortModels(models) {
+  const tierOrder = { high: 3, medium: 2, low: 1 };
+  const isFav = m => state.favorites.has(`${m.provider}/${m.model}`);
+  
+  return [...models].sort((a, b) => {
+    const fa = isFav(a), fb = isFav(b);
+    if (fa !== fb) return fb - fa; // 收藏优先
+    
+    switch (state.modelSortBy) {
+      case 'score':
+        return (getProviderScore(b.provider) || 0) - (getProviderScore(a.provider) || 0);
+      case 'tier':
+        return (tierOrder[b.tier] || 0) - (tierOrder[a.tier] || 0);
+      case 'provider':
+        return a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model);
+      case 'name':
+        return a.model.localeCompare(b.model);
+      default: // favorite
+        return 0;
+    }
+  });
+}
+
+function getProviderScore(provider) {
+  // 基于：免费模型数、日额度、恢复速度、健康度
+  const models = state.models.filter(m => m.provider === provider && m.type === 'free' && !m.disabled);
+  if (!models.length) return 0;
+  
+  const freeCount = models.length;
+  const hasVision = models.some(m => (m.tags || []).includes('vision'));
+  const hasReasoning = models.some(m => (m.tags || []).includes('reasoning'));
+  const hasCode = models.some(m => (m.tags || []).includes('code'));
+  const highTier = models.filter(m => m.tier === 'high').length;
+  
+  // 额度数据
+  let totalRpd = 0, healthy = 0;
+  models.forEach(m => {
+    const key = `${m.provider}/${m.model}`;
+    const usage = state.quota.usage?.[key];
+    if (usage) {
+      totalRpd += usage.rpd || 0;
+      if (!state.cooldowns[key] && !state.quota.predicted_exhausted?.[key]) healthy++;
+    }
+  });
+  
+  // 评分公式：免费模型数*10 + 高Tier*5 + 能力加成 + 健康度*2 + 日额度/100
+  return freeCount * 10 + highTier * 5 + (hasVision ? 8 : 0) + (hasReasoning ? 5 : 0) + (hasCode ? 5 : 0) + healthy * 2 + Math.min(totalRpd / 100, 50);
+}
+
+function getModelStatus(m) {
+  if (m.disabled) return { class: 'danger', text: '已禁用', badge: 'danger' };
+  const cdKey = `${m.provider}/${m.model}`;
+  if (state.cooldowns[cdKey]) return { class: 'warning', text: '冷却中', badge: 'warning' };
+  if (state.quota.predicted_exhausted?.[cdKey]) return { class: 'warning', text: '预冷却', badge: 'warning' };
+  return { class: 'success', text: '正常', badge: 'success' };
+}
+
+function toggleFavorite(m) {
+  const key = `${m.provider}/${m.model}`;
+  if (state.favorites.has(key)) state.favorites.delete(key);
+  else state.favorites.add(key);
+  localStorage.setItem('fr_favorites', JSON.stringify([...state.favorites]));
+  renderModelsView();
+}
+
+function updateModelsMeta() {
+  const meta = $('#modelsMeta');
+  if (!meta) return;
+  const total = state.models.length;
+  const free = state.models.filter(m => m.type === 'free').length;
+  const paid = total - free;
+  const favCount = state.favorites.size;
+  meta.innerHTML = `共 ${total} 个模型（免费 ${free} · 付费 ${paid}） · ⭐ 收藏 ${favCount} 个`;
+}
+
+function renderModelsView() {
+  const container = $('#modelsContainer');
+  if (!container) return;
+  let models = getFilteredModels();
+  models = sortModels(models);
+  
+  if (state.currentView === 'table') renderModelsTable(models, container);
+  else if (state.currentView === 'cards') renderModelsCards(models, container);
+  else if (state.currentView === 'tree') renderModelsTree(models, container);
+  else if (state.currentView === 'scorecard') renderProviderScorecard(container);
+}
+
+function renderProviderScorecard(container) {
+  container.innerHTML = '';
+  
+  // 计算每个提供商评分
+  const scores = state.providers.map(p => ({
+    provider: p,
+    score: getProviderScore(p),
+    freeModels: state.models.filter(m => m.provider === p && m.type === 'free' && !m.disabled).length,
+    totalModels: state.models.filter(m => m.provider === p && !m.disabled).length,
+    hasVision: state.models.some(m => m.provider === p && (m.tags || []).includes('vision')),
+    hasReasoning: state.models.some(m => m.provider === p && (m.tags || []).includes('reasoning')),
+    hasCode: state.models.some(m => m.provider === p && (m.tags || []).includes('code')),
+  })).filter(s => s.freeModels > 0).sort((a, b) => b.score - a.score);
+  
+  if (!scores.length) {
+    container.innerHTML = '<div class="empty-state">📊<br>暂无免费模型提供商</div>';
+    return;
+  }
+  
+  const grid = el('div', { class: 'scorecard-grid' });
+  scores.forEach((s, idx) => {
+    const rankClass = idx === 0 ? 'gold' : idx === 1 ? 'silver' : idx === 2 ? 'bronze' : '';
+    grid.appendChild(el('div', { class: `scorecard ${rankClass}` }, [
+      el('div', { class: 'scorecard-rank' }, `#${idx + 1}`),
+      el('div', { class: 'scorecard-header' }, [
+        el('div', { class: 'scorecard-title' }, s.provider),
+        el('div', { class: `scorecard-score ${rankClass}` }, Math.round(s.score)),
+      ]),
+      el('div', { class: 'scorecard-meta' }, [
+        el('span', { class: 'scorecard-tag' }, `${s.freeModels} 免费模型`),
+        s.hasVision && el('span', { class: 'scorecard-tag vision' }, '👁 视觉'),
+        s.hasReasoning && el('span', { class: 'scorecard-tag reasoning' }, '🧠 推理'),
+        s.hasCode && el('span', { class: 'scorecard-tag code' }, '💻 代码'),
+      ].filter(Boolean)),
+      el('div', { class: 'scorecard-action' }, [
+        el('button', { class: 'btn outline', onclick: () => { state.modelFilters.provider = s.provider; state.currentView = 'table'; renderModels(); switchTab('table'); } }, '查看模型'),
+      ])
+    ]));
+  });
+  container.appendChild(grid);
+}
+
+function renderModelsTable(models, container) {
+  container.innerHTML = '';
+  if (models.length === 0) { container.innerHTML = '<div class="empty-state">🤖<br>暂无匹配的模型</div>'; return; }
+
+  // 按提供商分组
+  const grouped = {};
+  models.forEach(m => {
+    if (!grouped[m.provider]) grouped[m.provider] = [];
+    grouped[m.provider].push(m);
+  });
+
+  const wrapper = el('div', { class: 'models-table-wrapper' });
+  const providers = Object.keys(grouped).sort();
+  
+  providers.forEach((provider, pi) => {
+    const providerModels = grouped[provider];
+    const section = el('div', { class: 'provider-section' }, [
+      el('div', { class: 'provider-section-header', onclick: () => toggleProviderSection(provider + '-models') }, [
+        el('span', { class: 'provider-section-title' }, `${provider} (${providerModels.length} 个模型)`),
+        el('span', { class: 'provider-section-toggle' }, '▼'),
+      ]),
+      el('div', { class: 'provider-section-content', id: provider + '-models' }, [
+        el('div', { class: 'models-table-wrapper' }, [
+          el('table', { class: 'models-table' }, [
+            el('thead', {}, el('tr', {}, [
+                          el('th', {}, '⭐'), el('th', {}, '模型'), el('th', {}, '类型'), el('th', {}, 'Tier'), el('th', {}, '标签'), el('th', {}, '优先级'), el('th', {}, '状态'), el('th', {}, '操作')
+                        ])),
+                        el('tbody', {}, providerModels.map(m => {
+                          const st = getModelStatus(m);
+                          const isFav = state.favorites.has(`${m.provider}/${m.model}`);
+                          return el('tr', { class: `model-row ${st.class}`, 'data-model-id': `${m.provider}/${m.model}` }, [
+                            el('td', { class: 'fav-cell' }, el('button', { class: `btn-fav ${isFav ? 'active' : ''}`, onclick: (e) => { e.stopPropagation(); toggleFavorite(m); } }, isFav ? '★' : '☆')),
+                            el('td', { style: 'font-family: var(--font-mono)' }, m.model),
+                            el('td', {}, el('span', { class: `status-badge ${m.type === 'free' ? 'success' : 'warning'}` }, m.type === 'free' ? '免费' : '付费')),
+                            el('td', {}, getTierStars(m.tier)),
+                            el('td', {}, el('div', { class: 'tags' }, (m.tags || []).map(t => el('span', { class: `tag ${getTagClass(t)}` }, t)))),
+                            el('td', {}, m.priority || 0),
+                            el('td', {}, el('span', { class: `status-badge ${st.badge}` }, st.text)),
+                            el('td', {}, el('div', { class: 'action-buttons' }, [
+                              el('button', { class: 'btn ghost', onclick: () => showEditModelModal(m) }, '✏️'),
+                              el('button', { class: 'btn ghost danger', onclick: () => deleteModel(m.provider, m.model) }, '🗑️'),
+                              el('button', { class: 'btn ghost', onclick: () => forceSwitchModel(m.provider, m.model) }, '⚡'),
+                            ]))
+                          ]);
+                        }))
+          ])
+        ])
+      ])
+    ]);
+    wrapper.appendChild(section);
+  });
+
+  container.appendChild(wrapper);
+}
+
+function renderModelsTree(models, container) {
+  container.innerHTML = '';
+  if (models.length === 0) { container.innerHTML = '<div class="empty-state">🤖<br>暂无匹配的模型</div>'; return; }
+
+  const grouped = {};
+  models.forEach(m => { if (!grouped[m.provider]) grouped[m.provider] = []; grouped[m.provider].push(m); });
+
+  Object.entries(grouped).forEach(([provider, ms]) => {
+    const healthy = ms.filter(m => !m.disabled && !state.cooldowns[`${m.provider}/${m.model}`]).length;
+    const group = el('div', { class: 'provider-group' }, [
+      el('div', { class: 'provider-header', onclick: e => { if (e.target === e.currentTarget || e.target.closest('.provider-toggle')) toggleProviderGroup(e.currentTarget); } }, [
+        el('div', { class: 'provider-info' }, [
+          el('span', { class: 'provider-name' }, provider),
+          el('span', { class: 'provider-count' }, `${healthy}/${ms.length} 可用`),
+        ]),
+        el('span', { class: 'provider-toggle' }, '▼'),
+      ]),
+      el('div', { class: 'provider-models' }, ms.map(m => {
+        const st = getModelStatus(m);
+        return el('div', { class: `model-item ${st.class}`, 'data-model-id': `${m.provider}/${m.model}` }, [
+          el('label', { class: 'model-item-label' }, [
+            el('input', { type: 'checkbox', class: 'model-select', onchange: updateBulkDeleteBtn }),
+            el('span', {}, m.model),
+            el('span', { class: `status-badge ${st.badge}` }, st.text),
+          ]),
+          el('div', { class: 'model-details' }, [
+            el('span', {}, getTierStars(m.tier)),
+            ...(m.tags || []).map(t => el('span', { class: `tag ${getTagClass(t)}` }, t)),
+          ]),
+        ]);
+      })),
+    ]);
+    container.appendChild(group);
+  });
+}
+
+function toggleProviderGroup(header) {
+  const group = header.closest('.provider-group');
+  group.classList.toggle('open');
+}
+
+function updateBulkDeleteBtn() {
+  const btn = $('#btnBulkDelete'); // 如果有批量删除按钮
+  if (btn) {
+    const count = $$('.model-select:checked').length;
+    btn.disabled = count === 0;
+    btn.textContent = `删除选中 (${count})`;
+  }
+}
+
+// ============ Section 3: 提供商阵列 ============
+function renderProviders() {
+  console.log('[free-router] renderProviders called, state.providers:', state.providers);
+  const grid = $('#providerGrid');
+  console.log('[free-router] providerGrid element:', grid);
+  if (!grid) return;
+  if (!state.providers.length) { 
+    console.log('[free-router] No providers data, showing empty state');
+    grid.innerHTML = '<div class="empty-state">🏢<br>暂无提供商数据</div>'; 
+    return; 
+  }
+  // ...
+
+  grid.innerHTML = '';
+  state.providers.forEach(p => {
+    const isHealthy = !Object.keys(state.cooldowns).some(k => k.startsWith(p.provider + '/'));
+    grid.appendChild(el('div', { class: 'provider-card', onclick: () => showProviderModels(p.provider) }, [
+      el('div', { class: 'provider-card-header' }, [
+        el('span', { class: 'provider-card-name' }, p.provider),
+        el('span', { class: `provider-card-status ${isHealthy ? 'healthy' : 'warning'}` }, isHealthy ? '● 正常' : '● 有冷却'),
+      ]),
+      el('div', { class: 'provider-card-stats' }, `${p.modelCount} 个模型`),
+      el('div', { class: 'provider-card-actions' }, [
+        el('button', { class: 'btn outline', onclick: e => { e.stopPropagation(); refreshProvider(p.provider); } }, '刷新模型'),
+        el('button', { class: 'btn primary', onclick: e => { e.stopPropagation(); showProviderModels(p.provider); } }, '查看模型'),
+      ]),
+    ]));
+  });
+}
+
+async function refreshProvider(provider) {
+  try {
+    await api(`/providers/${provider}/refresh`, { method: 'POST' });
+    showToast(`${provider} 模型列表已刷新`, 'success');
+    await loadModels(); await loadDashboard(); renderAll();
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+function showProviderModels(provider) {
+  const models = state.models.filter(m => m.provider === provider);
+  const content = el('div', {}, [
+    el('h3', {}, `${provider} 的模型 (${models.length})`),
+    el('div', { class: 'models-grid', style: 'max-height: 400px; overflow: auto' }, models.map(m => {
+      const st = getModelStatus(m);
+      return el('div', { class: `model-card ${st.class}` }, [
+        el('div', { class: 'model-card-header' }, [
+          el('strong', {}, m.model),
+          el('span', { class: `status-badge ${st.badge}` }, st.text),
+        ]),
+        el('div', { class: 'model-card-meta' }, `类型: ${m.type} | Tier: ${getTierStars(m.tier)} | 优先级: ${m.priority}`),
+        el('div', { class: 'model-card-tags' }, (m.tags || []).map(t => el('span', { class: `tag ${getTagClass(t)}` }, t))),
+      ]);
+    })),
+  ]);
+  showModal(el('div', { class: 'modal' }, [
+    el('div', { class: 'modal-header' }, [el('h3', { class: 'modal-title' }, `${provider} 模型列表`), el('button', { class: 'modal-close', onclick: hideModal }, '✕')]),
+    el('div', { class: 'modal-body' }, content),
+    el('div', { class: 'modal-footer' }, [el('button', { class: 'btn primary', onclick: hideModal }, '关闭')]),
+  ]));
+}
+
+// ============ Section 4: 额度分析 ============
+function renderQuota() {
+  const usage = state.quota.usage || {};
+  const predicted = state.quota.predicted_exhausted || {};
+
+  $('#btnQuotaRefresh')?.addEventListener('click', async () => { await loadDashboard(); renderQuota(); showToast('已刷新', 'success'); });
+
+  const totalRpd = Object.values(usage).reduce((a, b) => a + (b.rpd || 0), 0);
+  const totalRpm = Object.values(usage).reduce((a, b) => a + (b.rpm || 0), 0);
+  const totalTpd = Object.values(usage).reduce((a, b) => a + (b.tpd || 0), 0);
+  const preCool = Object.keys(predicted).length;
+
+  $('#quotaSummary').innerHTML = '';
+  [{ label: '今日总请求 (RPD)', value: totalRpd, icon: '📊', class: 'cyan' },
+   { label: '当前分钟请求 (RPM)', value: totalRpm, icon: '⚡', class: 'amber' },
+   { label: '总 Token (TPD)', value: totalTpd.toLocaleString(), icon: '🔤', class: 'green' },
+   { label: '预冷却模型', value: preCool, icon: '⚠️', class: preCool ? 'red' : 'green' }].forEach(k => {
+    $('#quotaSummary').appendChild(el('div', { class: 'metric-card' }, [
+      el('div', { class: `metric-icon ${k.class}` }, k.icon),
+      el('div', { class: 'metric-value' }, k.value),
+      el('div', { class: 'metric-label' }, k.label),
+    ]));
+  });
+
+  const wrap = $('#quotaTableWrap');
+  if (Object.keys(usage).length) {
+    wrap.innerHTML = '';
+    
+    // 按提供商分组
+    const grouped = {};
+    Object.entries(usage).forEach(([k, v]) => {
+      const provider = k.split('/')[0];
+      if (!grouped[provider]) grouped[provider] = [];
+      grouped[provider].push({ model: k, ...v });
+    });
+
+    const providers = Object.keys(grouped).sort();
+    
+        providers.forEach((provider, pi) => {
+          const models = grouped[provider].sort((a, b) => (b.rpd || 0) - (a.rpd || 0));
+          const isPreCool = predicted[k];
+      
+      const section = el('div', { class: 'provider-section' }, [
+        el('div', { class: 'provider-section-header', onclick: () => toggleProviderSection(provider + '-quota') }, [
+          el('span', { class: 'provider-section-title' }, `${provider} (${models.length} 个模型)`),
+          el('span', { class: 'provider-section-toggle' }, '▼'),
+        ]),
+        el('div', { class: 'provider-section-content', id: provider + '-quota' }, [
+          el('table', { class: 'data-table' }, [
+            el('thead', {}, el('tr', {}, ['模型', 'RPM', 'RPD', 'TPM', 'TPD', '状态'].map(t => el('th', {}, t)))),
+            el('tbody', {}, models.map(([k, v]) => {
+              const isPreCool = predicted[k];
+              return el('tr', { class: isPreCool ? 'warning-row' : '' }, [
+                el('td', {}, `<code>${k}</code>`),
+                el('td', {}, v.rpm || 0), el('td', {}, v.rpd || 0), el('td', {}, v.tpm || 0), el('td', {}, v.tpd || 0),
+                el('td', {}, isPreCool ? el('span', { class: 'status-badge warning' }, '预冷却') : el('span', { class: 'status-badge success' }, '正常')),
+              ]);
+            }))
+          ])
+        ])
+      ]);
+      wrap.appendChild(section);
+    });
+  } else {
+    wrap.innerHTML = '<div class="empty-state">📈<br>暂无额度使用数据</div>';
+  }
+}
+
+// ============ Section 5: 冷却中心 ============
+function renderCooldown() {
+  const cds = state.cooldowns || {};
+
+  $('#btnResetAllCooldown')?.addEventListener('click', resetAllCooldowns);
+  $('#btnCooldownRefresh')?.addEventListener('click', async () => { await loadDashboard(); renderCooldown(); showToast('已刷新', 'success'); });
+
+  const wrap = $('#cooldownTableWrap');
+  const empty = $('#cooldownEmpty');
+  if (!Object.keys(cds).length) {
+    wrap.innerHTML = ''; empty.hidden = false; return;
+  }
+  empty.hidden = true;
+  wrap.innerHTML = '';
+  const table = el('table', { class: 'data-table' }, [
+    el('thead', {}, el('tr', {}, ['模型', '原因', '剩余时间', '命中次数', '操作'].map(t => el('th', {}, t)))),
+    el('tbody', {}, Object.entries(cds).map(([k, v]) => {
+      const [provider, model] = k.split('/');
+      const remaining = Math.max(0, Math.ceil(v.until - Date.now() / 1000));
+      const reasonClass = v.reason === 'key_unhealthy' ? 'danger' : v.reason === '429' ? 'warning' : 'info';
+      return el('tr', {}, [
+        el('td', {}, `<code>${k}</code>`),
+        el('td', {}, el('span', { class: `status-badge ${reasonClass}` }, v.reason)),
+        el('td', {}, formatDuration(remaining)),
+        el('td', {}, v.hits),
+        el('td', {}, el('button', { class: 'btn ghost', onclick: () => clearSingleCooldown(provider, model) }, '解除')),
+      ]);
+    }))
+  ]);
+  wrap.appendChild(table);
+}
+
+async function clearSingleCooldown(provider, model) {
+  showToast('单个冷却解除需后端支持，暂用"重置所有冷却"', 'warning');
+}
+
+async function resetAllCooldowns() {
+  if (!confirm('确定重置所有模型的冷却状态？')) return;
+  try {
+    await api('/reset_cooldowns', { method: 'POST' });
+    await loadDashboard(); renderAll(); showToast('所有冷却已重置', 'success');
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+// ============ Section 6: 缓存控制 ============
+function renderCache() {
+  const c = state.cache || {};
+
+  $('#btnToggleCache')?.addEventListener('click', toggleCache);
+  $('#btnClearCache')?.addEventListener('click', clearCache);
+  $('#btnCacheRefresh')?.addEventListener('click', async () => { await loadCache(); renderCache(); showToast('已刷新', 'success'); });
+
+  $('#cacheMetrics').innerHTML = '';
+  [{ label: '缓存状态', value: c.enabled ? '启用' : '禁用', icon: c.enabled ? '✅' : '⛔', class: c.enabled ? 'green' : 'red' },
+   { label: '缓存条目', value: c.entries || 0, icon: '📦', class: 'cyan' },
+   { label: 'TTL', value: `${(c.ttl_seconds || 86400) / 3600}h`, icon: '⏱️', class: 'amber' },
+   { label: '命中服务', value: c.serve_hits ? '是' : '否', icon: c.serve_hits ? '✅' : '❌', class: c.serve_hits ? 'green' : 'amber' }].forEach(k => {
+    $('#cacheMetrics').appendChild(el('div', { class: 'metric-card' }, [
+      el('div', { class: `metric-icon ${k.class}` }, k.icon),
+      el('div', { class: 'metric-value' }, k.value),
+      el('div', { class: 'metric-label' }, k.label),
+    ]));
+  });
+
+  const eventsEl = $('#cacheEvents');
+  if (c.events && Object.keys(c.events).length) {
+    eventsEl.hidden = false;
+    eventsEl.textContent = JSON.stringify(c.events, null, 2);
+  } else { eventsEl.hidden = true; }
+}
+
+async function toggleCache() {
+  try {
+    await api('/cache', { method: 'POST', body: { enabled: !state.cache.enabled } });
+    await loadCache(); renderCache(); showToast(`缓存已${state.cache.enabled ? '禁用' : '启用'}`, 'success');
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+async function clearCache() {
+  if (!confirm('确定清空所有缓存？')) return;
+  try {
+    await api('/cache', { method: 'POST', body: { clear: true } });
+    await loadCache(); renderCache(); showToast('缓存已清空', 'success');
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+// ============ Section 7: 策略中心 ============
+function renderPolicy() {
+  const p = state.policy || {};
+
+  $('#btnResetPolicy')?.addEventListener('click', resetPolicy);
+  $('#policyForm')?.addEventListener('submit', e => { e.preventDefault(); hotLoadPolicy(); });
+
+  $('#policyCurrent').innerHTML = '';
+  const dl = $('#policyCurrent');
+  if (dl) {
+    dl.appendChild(el('dt', {}, '策略类')); dl.appendChild(el('dd', {}, `<code>${p.policy || 'BuiltinPolicy'}</code>`));
+    dl.appendChild(el('dt', {}, '模块路径')); dl.appendChild(el('dd', {}, `<code>${p.module || 'app.core.policy'}</code>`));
+    dl.appendChild(el('dt', {}, '内置策略')); dl.appendChild(el('dd', {}, p.builtin ? '是' : '否'));
+    dl.appendChild(el('dt', {}, '配置参数')); dl.appendChild(el('dd', {}, `<pre style="font-size:0.75rem;max-height:200px;overflow:auto">${JSON.stringify(p.config || {}, null, 2)}</pre>`));
+  }
+}
+
+async function hotLoadPolicy() {
+  const module = $('#policyModule').value.trim();
+  const cls = $('#policyClass').value.trim();
+  const args = $('#policyArgs').value.trim();
+  if (!module || !cls) { showToast('模块名和类名必填', 'danger'); return; }
+  let parsedArgs = {};
+  try { parsedArgs = args ? JSON.parse(args) : {}; } catch { showToast('参数 JSON 格式错误', 'danger'); return; }
+  try {
+    await api('/policy', { method: 'POST', body: { module, class: cls, args: parsedArgs } });
+    await loadPolicy(); renderPolicy(); showToast('策略已加载', 'success');
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+async function resetPolicy() {
+  try {
+    await api('/policy', { method: 'POST', body: { reset: true } });
+    await loadPolicy(); renderPolicy(); showToast('已恢复内置策略', 'success');
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+// ============ Section 8: 系统设置 ============
+function renderSettings() {
+  $('#btnHotRefresh')?.addEventListener('click', async () => { await api('/refresh', { method: 'POST' }); await loadDashboard(); renderSettings(); showToast('配置已热刷新', 'success'); });
+  $('#btnStatusRefresh')?.addEventListener('click', async () => { await loadDashboard(); renderSettings(); showToast('状态已刷新', 'success'); });
+  $('#btnDiag2')?.addEventListener('click', runDiagnostics);
+  $('#btnDiag')?.addEventListener('click', runDiagnostics);
+
+  $('#configPreview').textContent = JSON.stringify(state.settings, null, 2);
+}
+
+async function runDiagnostics() {
+  showToast('正在运行诊断...', 'info');
+  try {
+    const health = await api('/../health');
+    const status = await api('/status');
+    showToast(`诊断完成: 服务健康, 模型 ${status.models?.active}/${status.models?.total} 活跃`, 'success');
+  } catch (e) { showToast(`诊断失败: ${e.message}`, 'danger'); }
+}
+
+// ============ 模型 CRUD ============
+async function deleteModel(provider, model) {
+  if (!confirm(`确定删除 ${provider}/${model}？`)) return;
+  try {
+    await api('/models', { method: 'DELETE', body: { provider, model } });
+    await loadModels(); renderModelsView(); showToast('已删除', 'success');
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+async function forceSwitchModel(provider, model) {
+  try {
+    await api('/switch', { method: 'POST', body: { model: `${provider}/${model}` } });
+    showToast(`已切换到 ${provider}/${model}`, 'success');
+    await loadDashboard(); renderOverview();
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+function showAddModelModal() { showModelEditModal(null); }
+
+function showEditModelModal(model) {
+  const isEdit = !!model;
+  const providers = state.providers.map(p => p.provider);
+  const modal = el('div', { class: 'modal' }, [
+    el('div', { class: 'modal-header' }, [
+      el('h3', { class: 'modal-title' }, isEdit ? '编辑模型' : '添加模型'),
+      el('button', { class: 'modal-close', onclick: hideModal }, '✕'),
+    ]),
+    el('div', { class: 'modal-body' }, [
+      el('form', { id: 'modelForm' }, [
+        el('div', { class: 'form-group' }, [
+          el('label', {}, '提供商'),
+          el('select', { id: 'editProvider', required: true }, [
+            el('option', { value: '' }, '选择提供商'),
+            ...providers.map(p => el('option', { value: p }, p)),
+          ]),
+        ]),
+        el('div', { class: 'form-group' }, [el('label', {}, '模型 ID'), el('input', { type: 'text', id: 'editModel', placeholder: '如: Qwen/Qwen3.8-Flash', required: true })]),
+        el('div', { class: 'form-group' }, [el('label', {}, '类型'), el('select', { id: 'editType' }, [el('option', { value: 'free' }, '免费'), el('option', { value: 'paid' }, '付费')])]),
+        el('div', { class: 'form-group' }, [el('label', {}, 'Tier'), el('select', { id: 'editTier' }, [el('option', { value: 'high' }, '高'), el('option', { value: 'medium' }, '中'), el('option', { value: 'low' }, '低')])]),
+        el('div', { class: 'form-group' }, [el('label', {}, '标签 (逗号分隔)'), el('input', { type: 'text', id: 'editTags', placeholder: 'reasoning, code, vision' })]),
+        el('div', { class: 'form-group' }, [el('label', {}, '优先级'), el('input', { type: 'number', id: 'editPriority', min: 0, value: 0 })]),
+        el('div', { class: 'form-group' }, [el('label', {}, '启用'), el('input', { type: 'checkbox', id: 'editEnabled', checked: true })]),
+      ]),
+    ]),
+    el('div', { class: 'modal-footer' }, [
+      el('button', { class: 'btn outline', onclick: hideModal }, '取消'),
+      el('button', { class: `btn ${isEdit ? 'primary' : 'success'}`, onclick: () => { const f = $('#modelForm'); if (f.checkValidity()) { isEdit ? updateModel(model) : addModel(); } else f.reportValidity(); } }, isEdit ? '保存' : '添加'),
+    ]),
+  ]);
+  showModal(modal);
+
+  if (isEdit) {
+    $('#editProvider').value = model.provider;
+    $('#editModel').value = model.model;
+    $('#editType').value = model.type;
+    $('#editTier').value = model.tier;
+    $('#editTags').value = (model.tags || []).join(', ');
+    $('#editPriority').value = model.priority || 0;
+    $('#editEnabled').checked = !model.disabled;
+  }
+}
+
+async function addModel() {
+  const provider = $('#editProvider').value;
+  const modelId = $('#editModel').value.trim();
+  const type = $('#editType').value;
+  const tier = $('#editTier').value;
+  const tags = $('#editTags').value.split(',').map(t => t.trim()).filter(t => t);
+  const priority = parseInt($('#editPriority').value) || 0;
+
+  if (!provider || !modelId) { showToast('提供商和模型不能为空', 'danger'); return; }
+  if (!modelId.includes('/')) { showToast('模型 ID 应为 provider/name 格式', 'danger'); return; }
+  const [, modelName] = modelId.split('/');
+  try {
+    await api('/models', { method: 'POST', body: { provider, model: modelName, type, tags, priority } });
+    await loadModels(); renderModelsView(); hideModal(); showToast('已添加', 'success');
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+async function updateModel(oldModel) {
+  const [provider, modelName] = [$('#editProvider').value, $('#editModel').value.trim().split('/')[1]];
+  const type = $('#editType').value;
+  const tier = $('#editTier').value;
+  const tags = $('#editTags').value.split(',').map(t => t.trim()).filter(t => t);
+  const priority = parseInt($('#editPriority').value) || 0;
+  try {
+    await api(`/models/${encodeURIComponent(provider)}/${encodeURIComponent(modelName)}`, { method: 'PATCH', body: { type, tags, priority } });
+    await loadModels(); renderModelsView(); hideModal(); showToast('已更新', 'success');
+  } catch (e) { showToast(e.message, 'danger'); }
+}
+
+// ============ 主题切换 ============
+function applyTheme() {
+  // 深色主题已是默认，此处可扩展浅色主题
+  document.documentElement.setAttribute('data-theme', state.theme);
+  $('#btnTheme').textContent = state.theme === 'dark' ? '☀️' : '🌙';
+}
+
+$('#btnTheme')?.addEventListener('click', () => {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', state.theme);
+  applyTheme();
+});
+
+// ============ 粒子背景 ============
+function initParticles() {
+  const container = $('#particles');
+  if (!container) return;
+  // CSS 已处理基础粒子，这里可用 JS 生成更多
+  for (let i = 0; i < 12; i++) {
+    const p = document.createElement('div');
+    p.style.cssText = `
+      position: absolute; width: 3px; height: 3px; border-radius: 50%;
+      background: ${Math.random() > 0.5 ? 'var(--accent-cyan)' : 'var(--accent-violet)'};
+      box-shadow: 0 0 6px currentColor;
+      left: ${Math.random() * 100}%; top: ${Math.random() * 100}%;
+      opacity: ${0.2 + Math.random() * 0.4};
+      animation: particleFloat ${8 + Math.random() * 4}s ease-in-out infinite;
+      animation-delay: ${-Math.random() * 10}s;
+    `;
+    container.appendChild(p);
+  }
+}
+
+// ============ 初始化 ============
+async function init() {
+  console.log('[free-router] Initializing...');
+  applyTheme();
+
+  // 模态框背景点击关闭
+  $('#modalLayer')?.querySelector('.modal-backdrop')?.addEventListener('click', hideModal);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideModal(); });
+
+  try {
+    await loadDashboard();
+    await loadModels();
+    await loadPolicy();
+    await loadCache();
+    renderAll();
+    initScrollButtons(); // 初始化滚动按钮
+    console.log('[free-router] Initialization complete');
+  } catch (e) {
+    console.error('[free-router] 初始化失败:', e);
+    showToast(`初始化失败: ${e.message}`, 'danger');
+  }
+}
+
+// DOM ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

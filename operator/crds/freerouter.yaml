@@ -1,0 +1,108 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: freerouters.freerouter.io
+spec:
+  group: freerouter.io
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                replicas:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 2
+                image:
+                  type: string
+                  default: "free-router:latest"
+                config:
+                  type: object
+                  description: "free-router config.yaml content as inline object"
+                resources:
+                  type: object
+                  properties:
+                    limits:
+                      type: object
+                      additionalProperties:
+                        type: string
+                    requests:
+                      type: object
+                      additionalProperties:
+                        type: string
+                autoscaling:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    minReplicas:
+                      type: integer
+                      default: 2
+                    maxReplicas:
+                      type: integer
+                      default: 10
+                    targetCPUUtilizationPercentage:
+                      type: integer
+                      default: 70
+                ingress:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    host:
+                      type: string
+                    tlsSecret:
+                      type: string
+                serviceMonitor:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    interval:
+                      type: string
+                      default: "30s"
+              required:
+                - replicas
+                - image
+            status:
+              type: object
+              properties:
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                observedGeneration:
+                  type: integer
+                readyReplicas:
+                  type: integer
+                currentReplicas:
+                  type: integer
+  scope: Namespaced
+  names:
+    plural: freerouters
+    singular: freerouter
+    kind: FreeRouter
+    shortNames:
+      - fr

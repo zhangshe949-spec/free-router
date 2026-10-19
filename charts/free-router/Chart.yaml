@@ -1,0 +1,17 @@
+apiVersion: v2
+name: free-router
+description: Free-Router — 免费/收费大模型聚合路由网关（OpenAI 兼容，自动选型/容错切换/多租户）
+type: application
+version: 0.4.0
+appVersion: "0.4.0"
+keywords:
+  - llm
+  - gateway
+  - router
+  - openai
+  - kubernetes
+home: https://github.com/zhangshe949-spec/free-router
+sources:
+  - https://github.com/zhangshe949-spec/free-router
+maintainers: []
+icon: ""

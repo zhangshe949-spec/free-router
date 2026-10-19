@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Free-Router 管理面板</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#2b3444;
+    --fg:#e6edf3; --muted:#8b98a9; --accent:#3b82f6; --accent2:#1f6feb;
+    --ok:#3fb950; --warn:#d29922; --bad:#f85149; --chip:#233044;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:14px 20px;background:linear-gradient(180deg,#131a24,#0d1117);
+    border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.5px}
+  header .spacer{flex:1}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--muted)}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .dot.off{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+  #status-text{font-size:13px;color:var(--muted)}
+  #last-update{font-size:12px;color:var(--muted)}
+  main{padding:18px 20px 40px;max-width:1240px;margin:0 auto}
+  section{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:14px 16px;margin-bottom:16px}
+  section h2{font-size:14px;margin:0 0 12px;font-weight:600;color:var(--fg);
+    display:flex;align-items:center;gap:8px}
+  section h2::before{content:"";width:4px;height:14px;background:var(--accent);border-radius:2px}
+  .cards{display:flex;gap:12px;flex-wrap:wrap}
+  .card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    padding:12px 16px;min-width:110px;flex:1}
+  .card .k{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .card .v{font-size:22px;font-weight:700}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:820px){.grid2{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel)}
+  tbody tr:hover{background:#1a2230}
+  .wrap{max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+  code, .mono{font-family:"Cascadia Code",Consolas,Menlo,monospace;font-size:12.5px}
+  .chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;
+    background:var(--chip);color:var(--muted);border:1px solid var(--border)}
+  .chip.vision{background:#1f3a2a;color:#5be08a;border-color:#2c5a3f}
+  .chip.text{background:#2a2a33;color:#b0b8c4}
+  .chip.hot{background:#3a1f1f;color:#ff8a80;border-color:#5a2c2c}
+  .chip.cool{background:#3a3320;color:#e8c766;border-color:#5a4c2c}
+  .btn{cursor:pointer;border:1px solid var(--border);background:var(--panel2);
+    color:var(--fg);padding:8px 14px;border-radius:8px;font-size:13px;transition:.15s}
+  .btn:hover{border-color:var(--accent);color:#fff}
+  .btn.primary{background:var(--accent2);border-color:var(--accent2)}
+  .btn.primary:hover{background:#2d7ff9}
+  .btn.danger{border-color:#5a2c2c}
+  .btn.danger:hover{background:#3a1f1f;border-color:var(--bad)}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:12px;color:var(--muted)}
+  input,select{background:#0b0f16;border:1px solid var(--border);color:var(--fg);
+    border-radius:7px;padding:7px 10px;font-size:13px;min-width:120px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .inline{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  #log{background:#0b0f16;border:1px solid var(--border);border-radius:8px;
+    padding:10px 12px;max-height:180px;overflow:auto;font-size:12.5px;color:var(--muted)}
+  #log .ok{color:var(--ok)} #log .err{color:var(--bad)}
+  .empty{color:var(--muted);font-size:13px;padding:10px 4px}
+  .muted{color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Free-Router 管理面板</h1>
+  <span class="dot" id="status-dot"></span>
+  <span id="status-text">检测中…</span>
+  <span class="spacer"></span>
+  <span id="last-update"></span>
+</header>
+<main>
+
+  <section>
+    <h2>模型统计</h2>
+    <div class="cards" id="model-cards"><div class="empty">加载中…</div></div>
+  </section>
+
+  <section>
+    <h2>按提供商分布</h2>
+    <div class="cards" id="provider-cards"><div class="empty">加载中…</div></div>
+  </section>
+
+  <div class="grid2">
+    <section>
+      <h2>额度用量（RPM / RPD / TPM / TPD）</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>提供商 / 模型</th><th>RPM</th><th>RPD</th><th>TPM</th><th>TPD</th></tr></thead>
+          <tbody id="quota-body"><tr><td colspan="5" class="empty">暂无用量数据</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>活跃冷却</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>提供商 / 模型</th><th>原因</th><th>剩余(秒)</th><th>retry_after</th></tr></thead>
+          <tbody id="cooldown-body"><tr><td colspan="4" class="empty">无活跃冷却</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <section>
+    <h2>模型列表 <span class="muted" style="font-weight:400;font-size:12px" id="model-count"></span></h2>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="搜索 id 或提供商…" style="min-width:240px">
+      <label class="muted" style="font-size:12px"><input type="checkbox" id="only-vision" style="min-width:auto;vertical-align:-2px"> 仅视觉模型</label>
+    </div>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>模型 id</th><th>提供商</th><th>能力</th><th>层级</th><th>操作</th></tr></thead>
+        <tbody id="models-body"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>运维操作</h2>
+    <div class="actions" style="margin-bottom:12px">
+      <button class="btn primary" id="btn-refresh">重新发现模型</button>
+      <button class="btn" id="btn-reset">重置全部冷却</button>
+    </div>
+    <div class="inline">
+      <div class="field">
+        <label>provider</label>
+        <input id="cd-provider" placeholder="如 amd-radeon">
+      </div>
+      <div class="field">
+        <label>model</label>
+        <input id="cd-model" placeholder="如 DeepSeek-V4-Flash">
+      </div>
+      <div class="field">
+        <label>reason</label>
+        <select id="cd-reason">
+          <option value="429" selected>429</option>
+          <option value="5xx">5xx</option>
+          <option value="401">401</option>
+          <option value="model_not_found">model_not_found</option>
+        </select>
+      </div>
+      <button class="btn danger" id="btn-cooldown">强制冷却</button>
+      <span class="muted" style="width:100%;height:1px"></span>
+      <div class="field">
+        <label>model</label>
+        <input id="sw-model" placeholder="如 inclusionai/ling-3.0-flash-vl:free">
+      </div>
+      <div class="field">
+        <label>provider</label>
+        <input id="sw-provider" placeholder="如 kilogw">
+      </div>
+      <button class="btn primary" id="btn-switch">强制切换</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>操作日志</h2>
+    <div id="log"></div>
+  </section>
+
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+
+  function esc(s){
+    return String(s == null ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+  function log(msg, kind){
+    var el = document.createElement("div");
+    el.className = kind || "";
+    var t = new Date().toLocaleTimeString("zh-CN");
+    el.textContent = "[" + t + "] " + msg;
+    var box = $("log");
+    box.insertBefore(el, box.firstChild);
+    while(box.childNodes.length > 200){ box.removeChild(box.lastChild); }
+  }
+  function setOnline(on){
+    var d = $("status-dot"), t = $("status-text");
+    d.className = "dot " + (on ? "on" : "off");
+    t.textContent = on ? "服务在线" : "服务离线";
+    t.style.color = on ? "#3fb950" : "#f85149";
+  }
+  function fmt(n){
+    n = Number(n || 0);
+    if(n >= 1000000) return (n/1000000).toFixed(1) + "M";
+    if(n >= 1000) return (n/1000).toFixed(1) + "k";
+    return String(n);
+  }
+
+  var lastModels = [];
+
+  function renderStatus(d){
+    // —— 模型统计 ——
+    var m = d.models || {};
+    $("model-cards").innerHTML =
+      card("模型总数", m.total) +
+      card("活跃", m.active, "#3fb950") +
+      card("已下线", m.removed, "#f85149");
+
+    // —— 按提供商分布 ——
+    var bp = m.by_provider || {};
+    var keys = Object.keys(bp);
+    $("provider-cards").innerHTML = keys.length
+      ? keys.map(function(k){ return card(k, bp[k]); }).join("")
+      : '<div class="empty">暂无提供商数据</div>';
+
+    // —— 额度用量 ——
+    var usage = (d.quota && d.quota.usage) || {};
+    var uKeys = Object.keys(usage);
+    if(uKeys.length){
+      $("quota-body").innerHTML = uKeys.map(function(k){
+        var u = usage[k] || {};
+        return "<tr><td class='mono'>" + esc(k) + "</td>" +
+          "<td>" + fmt(u.rpm) + "</td><td>" + fmt(u.rpd) + "</td>" +
+          "<td>" + fmt(u.tpm) + "</td><td>" + fmt(u.tpd) + "</td></tr>";
+      }).join("");
+    } else {
+      $("quota-body").innerHTML = '<tr><td colspan="5" class="empty">暂无用量数据</td></tr>';
+    }
+
+    // —— 活跃冷却 ——
+    var cd = d.cooldowns || {};
+    var cKeys = Object.keys(cd);
+    var now = Date.now()/1000;
+    if(cKeys.length){
+      $("cooldown-body").innerHTML = cKeys.map(function(k){
+        var c = cd[k] || {};
+        var remain = Math.max(0, Math.round((c.until || 0) - now));
+        return "<tr><td class='mono'>" + esc(k) + "</td>" +
+          "<td><span class='chip cool'>" + esc(c.reason) + "</span></td>" +
+          "<td>" + remain + "</td>" +
+          "<td>" + esc(c.retry_after) + "</td></tr>";
+      }).join("");
+    } else {
+      $("cooldown-body").innerHTML = '<tr><td colspan="4" class="empty">无活跃冷却</td></tr>';
+    }
+  }
+
+  function card(k, v, color){
+    return "<div class='card'><div class='k'>" + esc(k) + "</div>" +
+      "<div class='v'" + (color ? " style='color:" + color + "'" : "") + ">" +
+      esc(v == null ? 0 : v) + "</div></div>";
+  }
+
+  function renderModels(list){
+    lastModels = list || [];
+    var q = ($("search").value || "").trim().toLowerCase();
+    var onlyV = $("only-vision").checked;
+    var rows = lastModels.filter(function(m){
+      var hit = !q || String(m.id).toLowerCase().indexOf(q) >= 0 ||
+                String(m.owned_by || "").toLowerCase().indexOf(q) >= 0;
+      var vis = !!(m.capability && m.capability.vision);
+      return hit && (!onlyV || vis);
+    });
+    $("model-count").textContent = "（" + rows.length + " / " + lastModels.length + "）";
+    if(!rows.length){
+      $("models-body").innerHTML = '<tr><td colspan="5" class="empty">无匹配模型</td></tr>';
+      return;
+    }
+    $("models-body").innerHTML = rows.map(function(m){
+      var vis = !!(m.capability && m.capability.vision);
+      var badge = vis
+        ? "<span class='chip vision'>👁 视觉</span>"
+        : "<span class='chip text'>文本</span>";
+      var tier = m.tier || (m.capability && m.capability.tier) || "—";
+      return "<tr><td class='mono'>" + esc(m.id) + "</td>" +
+        "<td>" + esc(m.owned_by) + "</td>" +
+        "<td>" + badge + "</td>" +
+        "<td>" + esc(tier) + "</td>" +
+        "<td><button class='btn' data-sw-model='" + esc(m.id) + "' data-sw-prov='" +
+          esc(m.owned_by) + "'>切换到此</button></td></tr>";
+    }).join("");
+
+    Array.prototype.forEach.call(
+      $("models-body").querySelectorAll("button[data-sw-model]"),
+      function(b){
+        b.addEventListener("click", function(){
+          doSwitch(b.getAttribute("data-sw-model"), b.getAttribute("data-sw-prov"));
+        });
+      });
+  }
+
+  function api(p, opts){
+    return fetch(p, Object.assign({
+      headers: {"Accept": "application/json"}
+    }, opts || {}));
+  }
+
+  function refreshStatus(){
+    return api("/admin/status").then(function(r){
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function(d){
+      renderStatus(d);
+      setOnline(true);
+      $("last-update").textContent = "上次刷新 " + new Date().toLocaleTimeString("zh-CN");
+    }).catch(function(e){
+      setOnline(false);
+    });
+  }
+
+  function refreshModels(){
+    return api("/v1/models").then(function(r){
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function(d){
+      renderModels((d && d.data) || []);
+    }).catch(function(){ /* 离线时保留旧列表 */ });
+  }
+
+  function post(url, label){
+    return api(url, {method: "POST"}).then(function(r){
+      return r.json().then(function(d){
+        if(!r.ok) throw new Error((d && d.detail) ? JSON.stringify(d.detail) : ("HTTP " + r.status));
+        log(label + " 成功：" + JSON.stringify(d), "ok");
+        return d;
+      });
+    }).catch(function(e){
+      log(label + " 失败：" + e.message, "err");
+    });
+  }
+
+  function doSwitch(model, provider){
+    if(!model || !provider){ log("切换需要 model 与 provider", "err"); return; }
+    post("/admin/switch?model=" + encodeURIComponent(model) +
+         "&provider=" + encodeURIComponent(provider),
+         "切换 " + model + " → " + provider)
+      .then(function(){ refreshStatus(); });
+  }
+
+  // —— 事件绑定 ——
+  $("search").addEventListener("input", function(){ renderModels(lastModels); });
+  $("only-vision").addEventListener("change", function(){ renderModels(lastModels); });
+
+  $("btn-refresh").addEventListener("click", function(){
+    post("/admin/refresh", "重新发现模型").then(function(){ refreshModels(); refreshStatus(); });
+  });
+  $("btn-reset").addEventListener("click", function(){
+    post("/admin/reset_cooldowns", "重置全部冷却").then(function(){ refreshStatus(); });
+  });
+  $("btn-cooldown").addEventListener("click", function(){
+    var p = $("cd-provider").value.trim();
+    var m = $("cd-model").value.trim();
+    var reason = $("cd-reason").value;
+    if(!p || !m){ log("强制冷却需要 provider 与 model", "err"); return; }
+    post("/admin/cooldown?provider=" + encodeURIComponent(p) +
+         "&model=" + encodeURIComponent(m) +
+         "&reason=" + encodeURIComponent(reason),
+         "冷却 " + p + "/" + m + "(" + reason + ")")
+      .then(function(){ refreshStatus(); });
+  });
+  $("btn-switch").addEventListener("click", function(){
+    doSwitch($("sw-model").value.trim(), $("sw-provider").value.trim());
+  });
+
+  // —— 启动：首刷 + 每 10s 自动刷新状态 ——
+  refreshStatus();
+  refreshModels();
+  setInterval(function(){ refreshStatus(); }, 10000);
+  setInterval(function(){ refreshModels(); }, 30000);
+  log("面板已就绪，状态每 10 秒自动刷新", "ok");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>free-router 控制台</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- ECharts - 尝试 CDN，失败时优雅降级 -->
+  <script>
+    window._echartsLoaded = false;
+    (function() {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
+      s.onload = function() { window._echartsLoaded = true; };
+      s.onerror = function() { console.warn('ECharts CDN 加载失败，图表功能将不可用'); };
+      document.head.appendChild(s);
+    })();
+  </script>
+</head>
+<body>
+  <div id="app">
+    <!-- 背景氛围层 -->
+    <div class="bg-atmosphere">
+      <div class="grid-lines"></div>
+      <div class="orbit-ring"></div>
+      <div class="particle-field" id="particles"></div>
+    </div>
+
+    <!-- 模型通知弹窗容器（右下角） -->
+    <div id="notificationContainer" class="notification-container">
+    </div>
+
+    <!-- 通知详情模态框 -->
+    <div id="notificationModal" class="notification-modal" style="display: none;">
+      <div class="notification-modal-content">
+        <div class="notification-modal-header">
+          <h3 id="notificationModalTitle">通知详情</h3>
+          <button class="notification-modal-close" id="notificationModalClose">&times;</button>
+        </div>
+        <div class="notification-modal-body" id="notificationModalBody">
+        </div>
+      </div>
+    </div>
+
+    <!-- 顶部导航栏 -->
+    <header class="top-bar">
+      <div class="brand">
+        <div class="brand-icon" id="brandIcon">🔀</div>
+        <span class="brand-text">free-router</span>
+        <span class="brand-sub">模型聚合网关控制台</span>
+      </div>
+      <div class="top-actions">
+        <div class="status-pill" id="statusPill">
+          <span class="pulse-dot"></span>
+          <span>服务正常</span>
+        </div>
+        <button class="icon-btn" id="btnTheme" title="切换主题" aria-label="主题">☀️</button>
+        <button class="icon-btn primary" id="btnDiag" title="一键诊断">⚡</button>
+      </div>
+    </header>
+
+    <!-- 主内容区：单页瀑布流 -->
+    <main class="flow-content" id="flowContent">
+      <!-- Section 1: 系统概览 Hero -->
+      <section class="flow-section hero-section" id="sec-overview">
+        <div class="section-header">
+          <h1 class="section-title">系统概览</h1>
+          <div class="section-meta">实时状态 · <span id="lastUpdate">刚刚</span></div>
+        </div>
+        <div class="metric-grid" id="metricGrid">
+          <!-- 动态生成 -->
+        </div>
+        <div class="chart-row" id="chartsRow">
+          <div class="chart-card" id="chartProvider">
+            <h3>提供商分布</h3>
+            <div class="chart-canvas" id="cProvider"></div>
+          </div>
+          <div class="chart-card" id="chartQuota">
+            <h3>额度消耗 TOP 10</h3>
+            <div class="chart-canvas" id="cQuota"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 模型更新通知（有事件时自动显示） -->
+      <section class="flow-section notify-section" id="sec-notify" hidden>
+        <div class="section-header">
+          <h1 class="section-title">🔔 模型更新通知 <span class="notify-badge" id="notifyCount">0</span></h1>
+          <div class="section-meta">
+            <span>自动发现新增 / 下线的模型，请判断是否保留</span>
+            <button class="btn outline" id="btnNotifyAckAll">全部已读</button>
+          </div>
+        </div>
+        <div class="notify-list" id="notifyList"></div>
+      </section>
+
+      <!-- Section 2: 模型矩阵 -->
+      <section class="flow-section" id="sec-models">
+        <div class="section-header">
+          <h1 class="section-title">模型矩阵</h1>
+          <div class="section-meta" id="modelsMeta"></div>
+        </div>
+        <div class="section-toolbar">
+          <input type="search" id="modelSearch" placeholder="搜索模型、提供商、标签..." aria-label="搜索模型">
+          <select id="modelFilterType" aria-label="类型筛选">
+            <option value="">全部类型</option>
+            <option value="free">免费</option>
+            <option value="paid">付费</option>
+          </select>
+          <select id="modelFilterProvider" aria-label="提供商筛选">
+            <option value="">全部提供商</option>
+          </select>
+          <select id="modelFilterCapability" aria-label="能力筛选">
+            <option value="">全部能力</option>
+            <option value="vision">视觉/图像</option>
+            <option value="reasoning">推理/思维链</option>
+            <option value="code">代码生成</option>
+            <option value="long">长上下文</option>
+          </select>
+          <select id="modelSortBy" aria-label="排序方式">
+            <option value="favorite">⭐ 收藏优先</option>
+            <option value="score">📊 综合评分</option>
+            <option value="tier">★ Tier 等级</option>
+            <option value="quota">🎁 免费额度</option>
+            <option value="recovery">⏱️ 额度恢复速度</option>
+            <option value="provider">🏷️ 提供商分组</option>
+            <option value="name">🔤 名称排序</option>
+          </select>
+          <button class="btn primary" id="btnAddModel">+ 添加模型</button>
+        </div>
+        <div class="view-toggle" role="tablist">
+          <button role="tab" data-view="table" class="active" aria-selected="true">表格视图</button>
+          <button role="tab" data-view="cards" aria-selected="false">卡片墙</button>
+          <button role="tab" data-view="tree" aria-selected="false">分组树</button>
+          <button role="tab" data-view="scorecard" aria-selected="false">提供商评分</button>
+        </div>
+        <div class="models-container" id="modelsContainer" role="tabpanel"></div>
+      </section>
+
+      <!-- Section 3: 提供商阵列 -->
+      <section class="flow-section" id="sec-providers">
+        <div class="section-header">
+          <h1 class="section-title">提供商阵列</h1>
+          <div class="section-meta">
+            <span>点击卡片查看旗下模型</span>
+            <button class="btn outline" id="btnKeyManager" title="管理各提供商的 API Key（支持多账号）">🔑 密钥管理</button>
+            <button class="btn outline" id="btnProbeAll" title="并发探测所有提供商的连通性与延迟">📡 全部测速</button>
+          </div>
+        </div>
+        <div class="provider-grid" id="providerGrid"></div>
+
+        <div class="catalog-header">
+          <h2 class="catalog-title">🌐 更多主流提供商</h2>
+          <span class="catalog-count" id="catalogCount"></span>
+        </div>
+        <div class="catalog-hint">国内 / 国外主流大模型平台，点击「接入」填 Key 即可启用（OpenAI 兼容端点，鼠标停留查看额度与认证说明）</div>
+        <div class="catalog-controls">
+          <div class="chip-group" id="catalogKindChips">
+            <button class="chip active" data-kind="">全部</button>
+            <button class="chip" data-kind="cn">国内</button>
+            <button class="chip" data-kind="intl">国外</button>
+            <button class="chip" data-kind="local">本地</button>
+          </div>
+          <label class="chip-toggle"><input type="checkbox" id="catalogHideProxy"> 隐藏需代理</label>
+          <label class="chip-toggle"><input type="checkbox" id="catalogOnlyFree"> 仅看有免费额度</label>
+        </div>
+        <div class="provider-grid" id="providerCatalog"></div>
+      </section>
+
+      <!-- Section 4: 额度分析 -->
+      <section class="flow-section" id="sec-quota">
+        <div class="section-header">
+          <h1 class="section-title">额度分析</h1>
+          <div class="section-toolbar">
+            <button class="btn outline" id="btnQuotaRefresh">刷新数据</button>
+          </div>
+        </div>
+        <div class="metric-grid compact" id="quotaSummary"></div>
+        <div class="data-table-wrapper" id="quotaTableWrap"></div>
+      </section>
+
+      <!-- Section 5: 冷却中心 -->
+      <section class="flow-section" id="sec-cooldown">
+        <div class="section-header">
+          <h1 class="section-title">冷却中心</h1>
+          <div class="section-toolbar">
+            <button class="btn danger" id="btnResetAllCooldown">重置全部冷却</button>
+            <button class="btn outline" id="btnCooldownRefresh">刷新</button>
+          </div>
+        </div>
+        <div class="data-table-wrapper" id="cooldownTableWrap"></div>
+        <div class="empty-state" id="cooldownEmpty" hidden>❄️ 暂无冷却中的模型，系统运行健康</div>
+      </section>
+
+      <!-- Section 6: 缓存控制 -->
+      <section class="flow-section" id="sec-cache">
+        <div class="section-header">
+          <h1 class="section-title">缓存控制</h1>
+          <div class="section-toolbar">
+            <button class="btn primary" id="btnToggleCache">禁用缓存</button>
+            <button class="btn danger" id="btnClearCache">清空缓存</button>
+            <button class="btn outline" id="btnCacheRefresh">刷新</button>
+          </div>
+        </div>
+        <div class="metric-grid compact" id="cacheMetrics"></div>
+        <div class="code-block" id="cacheEvents" hidden></div>
+      </section>
+
+      <!-- Section 7: 策略中心 -->
+      <section class="flow-section" id="sec-policy">
+        <div class="section-header">
+          <h1 class="section-title">策略中心</h1>
+        </div>
+        <div class="policy-panel">
+          <div class="policy-current">
+            <h3>当前策略</h3>
+            <dl id="policyCurrent"></dl>
+          </div>
+          <div class="policy-loader">
+            <h3>热加载自定义策略</h3>
+            <form id="policyForm" class="form-grid">
+              <div class="form-group">
+                <label>模块名</label>
+                <input type="text" id="policyModule" placeholder="my_pkg.my_policies" required>
+              </div>
+              <div class="form-group">
+                <label>类名</label>
+                <input type="text" id="policyClass" placeholder="WeightedPolicy" required>
+              </div>
+              <div class="form-group full">
+                <label>构造参数 (JSON)</label>
+                <textarea id="policyArgs" rows="3" placeholder='{ "weight_code": 2.0 }'></textarea>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn primary">加载策略</button>
+                <button type="button" class="btn outline" id="btnResetPolicy">恢复内置</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 8: 系统设置 -->
+      <section class="flow-section" id="sec-settings">
+        <div class="section-header">
+          <h1 class="section-title">系统设置</h1>
+        </div>
+        <div class="settings-panel">
+          <div class="settings-card">
+            <h3>配置预览</h3>
+            <p class="hint">只读预览。修改请编辑 config.yaml 后点击热刷新。</p>
+            <pre class="config-preview" id="configPreview"></pre>
+          </div>
+          <div class="settings-card">
+            <h3>运维操作</h3>
+            <div class="btn-group">
+              <button class="btn primary" id="btnHotRefresh">🔄 热刷新配置</button>
+              <button class="btn outline" id="btnStatusRefresh">刷新状态</button>
+              <button class="btn warning" id="btnDiag2">⚡ 一键诊断</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 9: Autofree 榜单 -->
+      <section class="flow-section" id="sec-autofree">
+        <div class="section-header">
+          <h1 class="section-title">🤖 Autofree 榜单</h1>
+          <div class="section-toolbar">
+            <button class="btn primary" id="btnAutofreeRefresh">🔄 重算榜单</button>
+            <button class="btn outline" id="btnAutofreeForceRefresh">🔥 强制重算</button>
+            <span class="toolbar-spacer"></span>
+            <span class="section-meta">Top <span id="autofreeTopN">10</span> / Fallback <span id="autofreeFallbackN">10</span> · 更新于 <span id="autofreeLastUpdate">—</span></span>
+          </div>
+        </div>
+        <div class="metric-grid compact" id="autofreeSummary"></div>
+        <div class="data-table-wrapper">
+          <table class="data-table" id="autofreeTable">
+            <thead>
+              <tr>
+                <th>排名</th>
+                <th>模型</th>
+                <th>提供商</th>
+                <th>层级</th>
+                <th>最终分</th>
+                <th>静态分</th>
+                <th>运行时分</th>
+                <th>成功率</th>
+                <th>平均延迟</th>
+                <th>请求数</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="autofreeTbody"></tbody>
+          </table>
+        </div>
+        <div class="autofree-legend">
+          <span class="legend-item"><span class="legend-dot top10"></span> Top10 核心</span>
+          <span class="legend-item"><span class="legend-dot fallback"></span> Fallback 兜底</span>
+          <span class="legend-item"><span class="legend-dot cooling"></span> 冷却中</span>
+          <span class="legend-item"><span class="legend-dot recovered"></span> 已恢复</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- Toast 容器 -->
+    <div class="toast-layer" id="toastLayer"></div>
+
+    <!-- 模态框层 -->
+    <div class="modal-layer" id="modalLayer" hidden>
+      <div class="modal-backdrop"></div>
+      <div class="modal-wrapper" id="modalWrapper"></div>
+    </div>
+  </div>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
