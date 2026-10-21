@@ -29,10 +29,10 @@ CFG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
 def _cfg(tmp_path=None):
     """用仓库配置；若给了 tmp 目录则复制一份（避免覆盖层写回仓库）。"""
     if tmp_path is None:
-        return load_config(CFG_PATH)
+        return load_config(CFG_PATH, load_env_files=False)
     dst = tmp_path / "config.yaml"
     shutil.copy2(CFG_PATH, dst)
-    return load_config(dst)
+    return load_config(dst, load_env_files=False)
 
 
 class OK:
@@ -307,7 +307,7 @@ def test_overlay_add_and_remove_model(tmp_path):
 
     overlay_mod.add_model(cfg_path, "kilogw", "vendor/new-model:free",
                           type="free", tags=["reasoning"], tier="high", priority=2)
-    cfg2 = load_config(cfg_path)
+    cfg2 = load_config(cfg_path, load_env_files=False)
     ids = [m.get("id") for m in cfg2.providers["kilogw"].models]
     assert "vendor/new-model:free" in ids, "覆盖层新增模型应出现在配置里"
     reg = Registry(cfg2, db_path=tmp_path / "t.db")
@@ -315,7 +315,7 @@ def test_overlay_add_and_remove_model(tmp_path):
     assert m and m.type == "free" and "reasoning" in m.tags and m.priority == 2
 
     overlay_mod.remove_model(cfg_path, "kilogw", "vendor/new-model:free")
-    cfg3 = load_config(cfg_path)
+    cfg3 = load_config(cfg_path, load_env_files=False)
     ids3 = [m.get("id") for m in cfg3.providers["kilogw"].models]
     assert "vendor/new-model:free" not in ids3
     assert ("kilogw", "vendor/new-model:free") in cfg3.disabled_models
@@ -329,7 +329,7 @@ def test_overlay_add_provider(tmp_path):
     overlay_mod.add_provider(cfg_path, "my-gw", "https://example.com/v1",
                              type="free", key_env="MY_GW_KEY")
     overlay_mod.add_model(cfg_path, "my-gw", "some-model:free", tags=["chat"])
-    cfg = load_config(cfg_path)
+    cfg = load_config(cfg_path, load_env_files=False)
     assert "my-gw" in cfg.providers
     assert cfg.providers["my-gw"].base_url == "https://example.com/v1"
     assert cfg.providers["my-gw"].models[0]["id"] == "some-model:free"
@@ -437,7 +437,7 @@ def test_admin_add_and_delete_model_via_app(tmp_path):
     from app import main as app_main
     cfg_path = tmp_path / "config.yaml"
     shutil.copy2(CFG_PATH, cfg_path)
-    cfg = load_config(cfg_path)
+    cfg = load_config(cfg_path, load_env_files=False)
     reg = Registry(cfg, db_path=tmp_path / "t.db")
     quota = QuotaEngine(cfg, db_path=tmp_path / "t.db")
     from app.core.lifecycle import LifecycleManager

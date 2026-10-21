@@ -22,7 +22,7 @@ NEW = ["zhipu", "siliconflow", "qianfan", "hunyuan", "spark", "dashscope", "ark"
 
 @pytest.fixture
 def cfg():
-    return load_config(CFG_PATH)
+    return load_config(CFG_PATH, load_env_files=False)
 
 
 def test_seven_new_providers_present(cfg):

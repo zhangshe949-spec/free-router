@@ -132,18 +132,25 @@ class Config:
     alerter: dict = field(default_factory=dict)
 
 
-def load_config(path: Path) -> Config:
+def load_config(path: Path, load_env_files: bool = True) -> Config:
+    """读取配置。
+
+    load_env_files=False 时完全跳过 .env 加载（不读本地/全局密钥文件），
+    仅使用进程环境里已存在的变量。单元测试用它把测试与开发机真实凭据
+    隔离——否则测试会依赖 ~/.free-router/.env，在无凭据的 CI 上全部失败。
+    """
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
 
     # 加载 .env：先本目录（优先），再 config.yaml 里 env_files 指定的兜底来源
     # （如 ~/.free-router/.env，避免同一套 key 在多处重复维护）
-    _load_dotenv(path.parent / ".env")
-    for extra in (raw.get("env_files") or []):
-        p = Path(str(extra)).expanduser()          # 支持 ~/.free-router/.env
-        if not p.is_absolute():
-            p = path.parent.parent / p
-        if p.exists():                             # 缺失的兜底来源静默跳过
-            _load_dotenv(p)
+    if load_env_files:
+        _load_dotenv(path.parent / ".env")
+        for extra in (raw.get("env_files") or []):
+            p = Path(str(extra)).expanduser()          # 支持 ~/.free-router/.env
+            if not p.is_absolute():
+                p = path.parent.parent / p
+            if p.exists():                             # 缺失的兜底来源静默跳过
+                _load_dotenv(p)
 
     server = raw.get("server", {})
     cfg = Config(

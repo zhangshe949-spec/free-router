@@ -29,7 +29,7 @@ CFG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
 
 @pytest.fixture
 def cfg():
-    return load_config(CFG_PATH)
+    return load_config(CFG_PATH, load_env_files=False)
 
 
 class _FakeReq:

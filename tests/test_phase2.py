@@ -114,7 +114,7 @@ def test_anthropic_error_shape():
 
 # ---------- 端点 ----------
 def test_messages_endpoint_nonstream(tmp_path):
-    cfg = load_config(CFG_PATH)
+    cfg = load_config(CFG_PATH, load_env_files=False)
     reg = Registry(cfg, db_path=tmp_path / "m.db")
     reg._models = {}
     # 本测试验证 Anthropic 协议转换，不涉凭证：声明 zhipu 可用
@@ -146,7 +146,7 @@ def test_messages_endpoint_nonstream(tmp_path):
 
 
 def test_messages_endpoint_all_exhausted(tmp_path):
-    cfg = load_config(CFG_PATH)
+    cfg = load_config(CFG_PATH, load_env_files=False)
     reg = Registry(cfg, db_path=tmp_path / "e.db")
     reg._models = {}                       # 无可用模型 → AllExhausted
     quota = QuotaEngine(cfg, db_path=tmp_path / "e.db")

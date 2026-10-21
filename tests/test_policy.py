@@ -24,7 +24,7 @@ CFG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
 
 @pytest.fixture
 def env(tmp_path):
-    cfg = load_config(CFG_PATH)
+    cfg = load_config(CFG_PATH, load_env_files=False)
     reg = Registry(cfg, db_path=tmp_path / "t.db")
     quota = QuotaEngine(cfg, db_path=tmp_path / "t.db")
     return cfg, reg, quota
@@ -38,9 +38,10 @@ class OK:
                 "usage": {"prompt_tokens": 1, "completion_tokens": 1}}
 
 
-def test_tier_priority_high_first(env):
+def test_tier_priority_high_first(env, keyless):
     """高质量模型优先被选中；low 小模型只作兜底。"""
     cfg, reg, quota = env
+    keyless(cfg, "amd-radeon", "modelscope")
     reg._models = {}
     reg._models["big"] = ModelEntry(id="big", provider="amd-radeon",
                                     capability={"score": 70}, tier="high")
@@ -54,9 +55,10 @@ def test_tier_priority_high_first(env):
     assert provs["modelscope"].calls == 0   # 小模型根本没被调用（仅兜底）
 
 
-def test_low_tier_fallback_when_high_down(env):
+def test_low_tier_fallback_when_high_down(env, keyless):
     """high 全部失败时，low 兜底保证任务不中断。"""
     cfg, reg, quota = env
+    keyless(cfg, "amd-radeon", "modelscope")
     reg._models = {}
     reg._models["big"] = ModelEntry(id="big", provider="amd-radeon",
                                     capability={"score": 70}, tier="high")
@@ -139,9 +141,10 @@ def test_paid_deepseek_never_in_pool(env):
     assert "deepseek" not in cfg.providers, "free-router 不应配置付费 deepseek 提供商"
 
 
-def test_unconfigured_key_provider_skipped(env):
+def test_unconfigured_key_provider_skipped(env, keyless):
     """需要 key 但未配置的提供商被直接跳过，不浪费 failover 名额。"""
     cfg, reg, quota = env
+    keyless(cfg, "kilogw")
     reg._models = {}
     # modelscope 需要一个不存在的环境变量 → 视为未配置
     cfg.providers["modelscope"].key_env = "NOPE_MISSING_KEY_ENV_XYZ"
