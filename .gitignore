@@ -1,0 +1,35 @@
+# ---- 密钥与本地配置（绝不提交）----
+.env
+config/.env
+config/providers.local.yaml
+**/.env
+**/*.local.yaml
+
+# ---- 运行时数据 ----
+data/*
+!data/.gitkeep
+*.db
+*.db-journal
+*.db-wal
+*.log
+*.pid
+probe_report.json
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+build/
+dist/
+.eggs/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

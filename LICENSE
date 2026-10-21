@@ -1,0 +1,58 @@
+Copyright (c) 2026 zhangshe949-spec (https://github.com/zhangshe949-spec)
+
+                          PROPRIETARY LICENSE
+                   ALL RIGHTS RESERVED / 保留所有权利
+
+Free-Router (the "Software"), including all source code, documentation,
+configuration schemas, prompts and design materials in this repository, is
+proprietary and confidential. It is NOT open source.
+
+1. GRANT OF LIMITED USE / 有限使用许可
+   You are granted a personal, non-exclusive, non-transferable, revocable
+   license to download and run the Software locally for your own private,
+   non-commercial evaluation and personal use.
+   仅授予个人、非独占、不可转让、可撤销的许可：为个人非商业目的下载并在本地
+   运行本软件。
+
+2. PROHIBITED USES / 禁止行为
+   Without prior written permission from the copyright holder, you may NOT:
+   (a) copy, mirror, re-upload or redistribute the Software or any substantial
+       part of it, in source or compiled form;
+   (b) publish, sublicense, sell, rent, lease or otherwise commercially exploit
+       the Software, including offering it as a hosted or SaaS service;
+   (c) modify, translate, reverse engineer (except where such restriction is
+       prohibited by applicable law), or create derivative works from it;
+   (d) remove, obscure or alter this license, any copyright notice, attribution
+       or authorship notice;
+   (e) use the Software or its name to train machine-learning models, or to
+       claim authorship/ownership of it.
+   未经版权人事先书面许可，不得：(a) 复制、镜像、重新上传或再分发本软件或其
+   实质部分；(b) 发布、再许可、出售、出租、租赁或以任何方式商业利用本软件，
+   包括作为托管或 SaaS 服务对外提供；(c) 修改、翻译、逆向工程或创作衍生作品；
+   (d) 删除、遮蔽或更改本许可证、版权声明或署名信息；(e) 使用本软件或其名称
+   训练机器学习模型，或声称对本软件的著作权/所有权。
+
+3. ATTRIBUTION / 署名
+   Any permitted reference to the Software must retain the notice
+   "Free-Router by zhangshe949-spec (https://github.com/zhangshe949-spec)".
+   任何获准的引用必须保留上述署名。
+
+4. NO WARRANTY / 免责
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE
+   USE OF THE SOFTWARE.
+   本软件按"现状"提供，不附带任何明示或默示担保；作者不承担因使用本软件产生
+   的任何责任。
+
+5. TERMINATION / 终止
+   Any breach of these terms automatically terminates your license. Upon
+   termination you must delete all copies of the Software.
+   违反本条款即自动终止授权，终止后须删除本软件的所有副本。
+
+6. GOVERNING TERMS / 其他
+   This license is not a grant of ownership. All rights not expressly granted
+   are reserved by the copyright holder. For licensing inquiries, open an issue
+   or contact the copyright holder via GitHub.
+   本许可证不构成所有权转让；未明确授予的权利均由版权人保留。

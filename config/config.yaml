@@ -1,0 +1,320 @@
+env_files:
+- ~/.free-router/.env
+server:
+  host: 127.0.0.1
+  port: 8787
+  openai_base: /v1
+providers:
+  amd-radeon:
+    base_url: https://developer.amd.com.cn/radeon/api/v1
+    key_env:
+    - RADEON_API_KEY
+    - AMD_API_KEY
+    api_key: ''
+    request_timeout: 30
+    tier_quality: high
+    models:
+    - id: DeepSeek-V4-Flash
+      capability:
+        score: 78
+        code: 82
+        reason: 80
+        long: 70
+        vision: false
+      tier: high
+      type: free
+      tags:
+      - reasoning
+      - code
+      - long
+    - id: DeepSeek-V4-Flash-Vision-Exp
+      capability:
+        score: 79
+        code: 80
+        reason: 79
+        long: 72
+        vision: true
+      tier: high
+    - id: Qwen3.8-Flash-Next
+      capability:
+        score: 70
+        code: 72
+        reason: 68
+        long: 66
+        vision: false
+      tier: medium
+    - id: Qwen2.5-VL-72B
+      capability:
+        score: 72
+        code: 70
+        reason: 72
+        long: 60
+        vision: true
+      tier: medium
+  modelscope:
+    base_url: https://api-inference.modelscope.cn/v1
+    key_env:
+    - MODELSCOPE_API_KEY
+    - HERMES_CUSTOM_MODELSCOPE_API_KEY
+    api_key: ''
+    request_timeout: 30
+    tier_quality: high
+    models:
+    - id: Qwen/Qwen3.8-Flash-Next
+      capability:
+        score: 70
+        code: 72
+        reason: 68
+        long: 66
+        vision: false
+      tier: medium
+    - id: OpenGVLab/InternVL3_5-241B-A28B
+      capability:
+        score: 74
+        code: 70
+        reason: 74
+        long: 60
+        vision: true
+      tier: medium
+    free_only: true
+  kilogw:
+    base_url: https://api.kilo.ai/api/openrouter
+    key_env: KILOCODE_API_KEY
+    extra_headers:
+      Authorization: ''
+    request_timeout: 10
+    tier_quality: high
+    free_only: true
+    models:
+    - id: inclusionai/ling-3.0-flash-vl:free
+      capability:
+        score: 68
+        code: 66
+        reason: 66
+        long: 60
+        vision: true
+      tier: medium
+      type: free
+      tags:
+      - vision
+      - chat
+  zhipu:
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    key_env: ZAI_API_KEY
+    api_key: ''
+    request_timeout: 30
+    tier_quality: high
+    models:
+    - id: glm-4-flash
+      capability:
+        score: 66
+        code: 68
+        reason: 66
+        long: 60
+        vision: false
+      tier: medium
+    - id: glm-4.7-flash
+      capability:
+        score: 70
+        code: 70
+        reason: 70
+        long: 78
+        vision: false
+      tier: high
+  siliconflow:
+    base_url: https://api.siliconflow.cn/v1
+    key_env: SILICONFLOW_API_KEY
+    api_key: ''
+    request_timeout: 30
+    tier_quality: medium
+    models:
+    - id: Qwen/Qwen2.5-7B-Instruct
+      capability:
+        score: 62
+        code: 60
+        reason: 62
+        long: 64
+        vision: false
+      tier: medium
+    - id: THUDM/glm-4-9b-chat
+      capability:
+        score: 63
+        code: 62
+        reason: 62
+        long: 62
+        vision: false
+      tier: medium
+    - id: Qwen/Qwen2.5-Coder-7B-Instruct
+      capability:
+        score: 63
+        code: 66
+        reason: 60
+        long: 62
+        vision: false
+      tier: medium
+  qianfan:
+    base_url: https://qianfan.baidubce.com/v2
+    key_env: QIANFAN_API_KEY
+    api_key: ''
+    request_timeout: 30
+    tier_quality: medium
+    models:
+    - id: ernie-speed-8k
+      capability:
+        score: 60
+        code: 58
+        reason: 60
+        long: 58
+        vision: false
+      tier: medium
+    - id: ernie-lite-8k
+      capability:
+        score: 56
+        code: 54
+        reason: 56
+        long: 56
+        vision: false
+      tier: medium
+  hunyuan:
+    base_url: https://api.hunyuan.cloud.tencent.com/v1
+    key_env: HUNYUAN_API_KEY
+    api_key: ''
+    request_timeout: 30
+    tier_quality: medium
+    models:
+    - id: hunyuan-lite
+      capability:
+        score: 60
+        code: 60
+        reason: 62
+        long: 62
+        vision: false
+      tier: medium
+  spark:
+    base_url: https://spark-api-open.xf-yun.com/v1
+    key_env: SPARK_API_KEY
+    api_key: ''
+    request_timeout: 30
+    tier_quality: medium
+    models:
+    - id: spark-lite
+      capability:
+        score: 58
+        code: 56
+        reason: 58
+        long: 56
+        vision: false
+      tier: medium
+  dashscope:
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    key_env: DASHSCOPE_API_KEY
+    api_key: ''
+    request_timeout: 30
+    tier_quality: high
+    models:
+    - id: qwen-plus
+      capability:
+        score: 72
+        code: 74
+        reason: 74
+        long: 80
+        vision: false
+      tier: high
+    - id: qwen-turbo
+      capability:
+        score: 66
+        code: 66
+        reason: 66
+        long: 72
+        vision: false
+      tier: medium
+  ark:
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    key_env: ARK_API_KEY
+    api_key: ''
+    request_timeout: 30
+    tier_quality: high
+    models:
+    - id: doubao-seed-1.6
+      capability:
+        score: 74
+        code: 74
+        reason: 74
+        long: 76
+        vision: true
+      tier: high
+    - id: deepseek-v3.1
+      capability:
+        score: 76
+        code: 80
+        reason: 78
+        long: 74
+        vision: false
+      tier: high
+router:
+  max_retries: 20
+  use_selector: true
+  sticky_ttl_seconds: 1800
+  prefer_vision_for_unknown: true
+  provider_order:
+  - amd-radeon
+  - modelscope
+  - kilogw
+  - zhipu
+  - siliconflow
+  - qianfan
+  - hunyuan
+  - spark
+  - dashscope
+  - ark
+quota:
+  rpm_limit: 60
+  rpd_limit: 1000
+  tpm_limit: 200000
+  tpd_limit: 5000000
+  cooldown_429: 60
+  cooldown_429_escalate:
+  - 300
+  - 1800
+  cooldown_5xx: 30
+  cooldown_persist_db: true
+  predict_window_seconds: 30
+  predict_threshold_seconds: 20
+lifecycle:
+  refresh_interval_hours: 12
+  enable_discovery: true
+  discovery_urls:
+    amd-radeon: https://developer.amd.com.cn/radeon/api/v1/models
+    modelscope: https://api-inference.modelscope.cn/v1/models
+    kilogw: https://api.kilo.ai/api/openrouter/models
+    zhipu: https://open.bigmodel.cn/api/paas/v4/models
+    siliconflow: https://api.siliconflow.cn/v1/models
+    qianfan: https://qianfan.baidubce.com/v2/models
+    hunyuan: https://api.hunyuan.cloud.tencent.com/v1/models
+    spark: https://spark-api-open.xf-yun.com/v1/models
+    dashscope: https://dashscope.aliyuncs.com/compatible-mode/v1/models
+    ark: https://ark.cn-beijing.volces.com/api/v3/models
+logging:
+  level: INFO
+  file: data/free_router.log
+cache:
+  enabled: true
+  ttl_seconds: 86400
+  max_entries: 2000
+  serve_hits: false
+metrics:
+  enabled: true
+alerter:
+  enabled: false
+  type: webhook
+  webhook_url: ''
+  smtp_host: ''
+  smtp_port: 587
+  smtp_user: ''
+  smtp_password: ''
+  smtp_from: ''
+  smtp_to: []
+  error_rate_threshold: 0.3
+  window_seconds: 300
+  min_interval_seconds: 600
+  fallback_to_paid: false
