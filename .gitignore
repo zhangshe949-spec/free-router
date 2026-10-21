@@ -22,6 +22,29 @@ build/
 *.egg-info/
 site/
 
+# Test / cache
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+*.log
+tests_out.txt
+test_*.py
+
+# MkDocs
+site/
+mkdocs_*.log
+
 # OS
 Thumbs.db
 .DS_Store
+
+# IDE
+.project
+.classpath
+.c9/
+*.swp
+*.swo
+*~

@@ -1351,13 +1351,54 @@ async def admin_autofree_favorite(request: Request):
 
 
 # ---------- Smart-Free 管理端点 ----------
+def _get_smart_router():
+    """获取 SmartRouter 实例，如果不存在则自动创建"""
+    router = app_state.get("router")
+    if router is None:
+        raise HTTPException(status_code=503, detail="路由器未初始化")
+    if not hasattr(router, "_smart_router") or router._smart_router is None:
+        # 自动初始化
+        from app.core.smart_router import SmartRouter
+        cfg = app_state.get("config")
+        smart_cfg_dict = {}
+        if cfg and hasattr(cfg, "smart_free"):
+            smart_cfg_dict = {
+                "load_balance_strategy": getattr(cfg.smart_free, "load_balance_strategy", "weighted_round_robin"),
+                "sticky_ttl_seconds": getattr(cfg.smart_free, "sticky_ttl_seconds", 300),
+                "max_retries": getattr(cfg.smart_free, "max_retries", 50),
+                "min_runtime_requests": getattr(cfg.smart_free, "min_runtime_requests", 5),
+            }
+        router._smart_router = SmartRouter(router.registry, router.quota, smart_cfg_dict)
+    return router._smart_router
+
+
+def _get_sustainability():
+    """获取 SustainabilityManager 实例，如果不存在则自动创建"""
+    router = app_state.get("router")
+    if router is None:
+        raise HTTPException(status_code=503, detail="路由器未初始化")
+    if not hasattr(router, "_sustainability") or router._sustainability is None:
+        # 自动初始化
+        from app.core.sustainability import SustainabilityManager
+        cfg = app_state.get("config")
+        sus_cfg_dict = {}
+        if cfg and hasattr(cfg, "sustainability"):
+            sus_cfg_dict = {
+                "enabled": getattr(cfg.sustainability, "enabled", True),
+                "global_quota_threshold": getattr(cfg.sustainability, "global_quota_threshold", 0.15),
+                "health_check_interval": getattr(cfg.sustainability, "health_check_interval", 60),
+                "auto_failover": getattr(cfg.sustainability, "auto_failover", True),
+                "learning_enabled": getattr(cfg.sustainability, "learning_enabled", True),
+            }
+        router._sustainability = SustainabilityManager(router.registry, router.quota, sus_cfg_dict)
+    return router._sustainability
+
+
 @app.get("/admin/smart-free/ranking")
 async def admin_smart_free_ranking():
     """获取 Smart-Free 智能路由的完整排名（按任务类型）"""
-    router = app_state.get("router")
-    if not router or not hasattr(router, "_smart_router"):
-        raise HTTPException(status_code=503, detail="smart-free 未初始化")
-    sr = router._smart_router
+    sr = _get_smart_router()
+    from app.core.smart_router import TaskType
     return {
         "task_types": {t.value: sr.get_top_candidates(t, limit=20) for t in TaskType},
         "load_balance_strategy": sr._load_balance_strategy,
@@ -1368,10 +1409,8 @@ async def admin_smart_free_ranking():
 @app.get("/admin/smart-free/task-types")
 async def admin_smart_free_task_types():
     """获取所有支持的任务类型及其匹配模型"""
-    router = app_state.get("router")
-    if not router or not hasattr(router, "_smart_router"):
-        raise HTTPException(status_code=503, detail="smart-free 未初始化")
-    sr = router._smart_router
+    sr = _get_smart_router()
+    from app.core.smart_router import TaskType
     return {
         "task_types": [
             {"value": t.value, "description": t.description}
@@ -1383,12 +1422,9 @@ async def admin_smart_free_task_types():
 @app.post("/admin/smart-free/recompute")
 async def admin_smart_free_recompute(request: Request):
     """强制重算 Smart-Free 路由匹配分"""
-    router = app_state.get("router")
-    if not router or not hasattr(router, "_smart_router"):
-        raise HTTPException(status_code=503, detail="smart-free 未初始化")
+    sr = _get_smart_router()
     data = await _admin_params(request)
     force = str(data.get("force", "")).lower() in ("1", "true", "yes")
-    sr = router._smart_router
     sr.recompute_match_scores(force=force)
     return {"ok": True, "forced": force}
 
@@ -1397,10 +1433,7 @@ async def admin_smart_free_recompute(request: Request):
 @app.get("/admin/sustainability")
 async def admin_sustainability():
     """获取可持续性管理器状态：全局配额、提供商健康分、告警"""
-    router = app_state.get("router")
-    if not router or not hasattr(router, "_sustainability"):
-        raise HTTPException(status_code=503, detail="sustainability 未初始化")
-    sus = router._sustainability
+    sus = _get_sustainability()
     return {
         "global_quota_remaining": sus.get_global_quota_remaining(),
         "global_quota_total": sus.get_global_quota_total(),
@@ -1417,20 +1450,14 @@ async def admin_sustainability():
 @app.get("/admin/sustainability/providers")
 async def admin_sustainability_providers():
     """获取所有提供商的详细健康状态"""
-    router = app_state.get("router")
-    if not router or not hasattr(router, "_sustainability"):
-        raise HTTPException(status_code=503, detail="sustainability 未初始化")
-    sus = router._sustainability
+    sus = _get_sustainability()
     return sus.get_provider_details()
 
 
 @app.post("/admin/sustainability/health-check")
 async def admin_sustainability_health_check(request: Request):
     """手动触发一次健康检查"""
-    router = app_state.get("router")
-    if not router or not hasattr(router, "_sustainability"):
-        raise HTTPException(status_code=503, detail="sustainability 未初始化")
-    sus = router._sustainability
+    sus = _get_sustainability()
     data = await _admin_params(request)
     provider = data.get("provider")
     await sus.force_health_check(provider)
@@ -1440,10 +1467,7 @@ async def admin_sustainability_health_check(request: Request):
 @app.post("/admin/sustainability/reset")
 async def admin_sustainability_reset(request: Request):
     """重置可持续性管理器状态（健康分、学习数据）"""
-    router = app_state.get("router")
-    if not router or not hasattr(router, "_sustainability"):
-        raise HTTPException(status_code=503, detail="sustainability 未初始化")
-    sus = router._sustainability
+    sus = _get_sustainability()
     sus.reset()
     return {"ok": True, "message": "可持续性管理器已重置"}
 
