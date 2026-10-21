@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """Anthropic Messages API <-> OpenAI Chat Completions 协议转换。
 
 - anthropic_to_openai(req)  : 请求体转换（system / content 块 / max_tokens）

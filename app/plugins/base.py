@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """插件基类：请求生命周期钩子（雏形）。
 
 钩子全部 async 且默认空实现，插件可只覆写自己关心的钩子。

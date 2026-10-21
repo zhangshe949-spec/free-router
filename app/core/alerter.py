@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """错误告警（P6）：错误率超阈值时通过 webhook / SMTP 通知，可选临时启用收费兜底。
 
 默认关闭（alerter.enabled=false），不引入任何依赖（urllib + smtplib 标准库）。

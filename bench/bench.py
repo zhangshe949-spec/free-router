@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """free-router 性能基准脚本。
 用法: python bench/bench.py [--host 127.0.0.1:8787] [--out bench_report.md]
 依赖: httpx (pip install httpx)

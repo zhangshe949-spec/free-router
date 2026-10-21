@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """路由选择器：过滤 → 任务感知打分排序 → 粘性 → 重试(最多20次) → 跨提供商切换。
 
 P0：免费/收费模型选择。候选池里带 type(free|paid) 与 tags；请求可携带任务上下文

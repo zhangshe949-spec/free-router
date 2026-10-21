@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """Phase 9 功能测试：模型元信息丰富 / 批量推理 / WebSocket 聊天 / 插件框架。
 
 全部使用 mock，不进行任何真实网络调用。
@@ -25,7 +28,7 @@ CFG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
 
 @pytest.fixture
 def cfg():
-    return load_config(CFG_PATH)
+    return load_config(CFG_PATH, load_env_files=False)
 
 
 # ============================================================

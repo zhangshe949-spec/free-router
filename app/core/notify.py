@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """模型更新通知（inbox）。
 
 自动发现在「新增/下线」模型时写入事件，供管理面板集中提示：

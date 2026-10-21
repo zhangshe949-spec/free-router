@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """内置示例插件。
 
 RequestLoggerPlugin：结构化日志记录请求/响应（method/path/status/耗时）。

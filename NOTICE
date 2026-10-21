@@ -1,0 +1,18 @@
+Free-Router
+Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+
+This repository is proprietary software, not open source.
+See LICENSE for the full terms.
+
+Summary of what you may / may not do:
+  ALLOWED   - clone and run locally for your own personal, non-commercial use
+  ALLOWED   - read the code to learn from it (no copying into other projects)
+  FORBIDDEN - re-publishing, mirroring, redistributing, forking for release
+  FORBIDDEN - commercial use, hosted/SaaS offerings, resale
+  FORBIDDEN - removing copyright/license/attribution notices
+  FORBIDDEN - using the code or its name to train ML models
+
+Third-party services referenced by name (AMD Radeon, ModelScope, Kilo,
+SiliconFlow, Zhipu, Ark/Volcengine, DeepSeek, etc.) are the property of their
+respective owners; this project is not affiliated with or endorsed by them.
+Their API terms of service remain in force for anyone using the Software.

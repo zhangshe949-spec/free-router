@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """额度监控引擎：RPM/RPD/TPM/TPD 四维 + 分级冷却 + SQLite 持久化 + 多租户 + 额度预测。
 
 从提供商错误体学习真实限制（而非仅硬编码）。

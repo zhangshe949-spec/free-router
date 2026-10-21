@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """API key 加密辅助：支持 api_key 以 'enc:' 前缀时解密。
 
 优先使用 cryptography 的 AES-GCM；若该库不可用，则退化为

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """指标采集（P5）：纯标准库，暴露 Prometheus 文本格式，无需 prometheus_client。
 
 端点：GET /metrics

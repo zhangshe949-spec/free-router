@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """opencode Zen「匿名免费车道」适配器。
 
 背景（2026-10 实测）：https://opencode.ai/zen/v1 对匿名客户端（`Authorization: Bearer public`）

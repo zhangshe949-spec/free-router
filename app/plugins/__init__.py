@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """插件框架（P9）：动态加载插件 + 请求生命周期钩子。
 
 插件通过 config.yaml 的 plugins 段配置：

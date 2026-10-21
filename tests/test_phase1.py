@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """Phase 1：7 家国内免费提供商配置/工厂测试（无真实网络）。"""
 import sys
 from pathlib import Path
@@ -19,7 +22,7 @@ NEW = ["zhipu", "siliconflow", "qianfan", "hunyuan", "spark", "dashscope", "ark"
 
 @pytest.fixture
 def cfg():
-    return load_config(CFG_PATH)
+    return load_config(CFG_PATH, load_env_files=False)
 
 
 def test_seven_new_providers_present(cfg):

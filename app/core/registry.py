@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """模型注册表访问器：内存 + SQLite 持久化，含已下线记录(去重)。"""
 import json
 import sqlite3

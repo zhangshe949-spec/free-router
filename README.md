@@ -1,5 +1,10 @@
 # Free-Router
 
+> **版权声明 / Copyright**
+> Copyright (c) 2026 [zhangshe949-spec](https://github.com/zhangshe949-spec). **All rights reserved.**
+> 本项目为**专有软件（非开源）**：允许个人在本地非商业运行，**禁止**复制再分发、镜像、商用或作为托管服务对外提供。
+> 完整条款见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
+
 **一个独立的免费/收费大模型聚合路由网关**（OpenAI 兼容）。把多家免费提供商的模型聚合成一个端点，
 按 **质量分级 + 任务需求 + 额度** 自动选型、自动跨提供商顺延、额度恢复自动回切；
 全部免费模型都不可用时用本地缓存兜底，保证任务不中断。

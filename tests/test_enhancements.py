@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """可选增强测试：Helm Chart / MkDocs / OpenTelemetry / 鉴权。
 
 全部为结构性校验 + 无网络的单元测试。
@@ -23,7 +26,7 @@ CFG_PATH = ROOT / "config" / "config.yaml"
 
 @pytest.fixture
 def cfg():
-    return load_config(CFG_PATH)
+    return load_config(CFG_PATH, load_env_files=False)
 
 
 @pytest.fixture(autouse=True)

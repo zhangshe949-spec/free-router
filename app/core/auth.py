@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """鉴权：API Key / JWT / RBAC + 中间件。
 
 - API Key：config.auth.api_keys（多 Key，绑定 tenant/scopes/roles/rate_limit/models_allowlist/denylist）

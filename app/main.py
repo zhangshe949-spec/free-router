@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """Free-Router 主应用入口 (FastAPI)
 OpenAI 兼容端点，聚合多家免费/收费提供商，自动路由 + 切换。
 

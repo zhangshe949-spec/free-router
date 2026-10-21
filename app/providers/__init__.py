@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """提供商适配器：统一 BaseAdapter 接口，各家实现 OpenAI 兼容调用。
 
 Phase 0 修复：流式透传。

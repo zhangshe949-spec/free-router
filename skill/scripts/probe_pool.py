@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """免费模型池实测探针：对每个候选模型发一次最小请求，输出真实可用性。
 
 用法：python scripts/probe_pool.py [--full]

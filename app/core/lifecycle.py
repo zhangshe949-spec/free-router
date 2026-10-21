@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """模型生命周期管理器：自动发现/新增/下线/改名/免费转付费/fallback chain。"""
 import asyncio
 import json

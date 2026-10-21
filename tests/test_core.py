@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """单元测试：路由/额度/生命周期核心逻辑（无真实网络）。"""
 import sys, os, asyncio
 from pathlib import Path
@@ -14,7 +17,7 @@ CFG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
 
 @pytest.fixture
 def env(tmp_path):
-    cfg = load_config(CFG_PATH)
+    cfg = load_config(CFG_PATH, load_env_files=False)
     reg = Registry(cfg, db_path=tmp_path / "t.db")
     quota = QuotaEngine(cfg, db_path=tmp_path / "t.db")
     return cfg, reg, quota
@@ -32,10 +35,11 @@ class MockProv:
                 "usage": {"prompt_tokens": 3, "completion_tokens": 2}}
 
 
-def test_cross_provider_failover(env):
+def test_cross_provider_failover(env, keyless):
     cfg, reg, quota = env
     # 每家只留一个模型，保证 provider 级 fail 语义确定（避免同商多模型干扰）
     reg._models = {}
+    keyless(cfg, "amd-radeon", "modelscope")
     reg.add("amd-m", "amd-radeon")
     reg.add("ms-m", "modelscope")
     provs = {"amd-radeon": MockProv("amd", fail_first=1),
@@ -85,8 +89,9 @@ def test_cooldown_escalation(env):
     assert cd["retry_after"] >= first
 
 
-def test_model_not_found_removal(env):
+def test_model_not_found_removal(env, keyless):
     cfg, reg, quota = env
+    keyless(cfg, "amd-radeon")
     reg.add("ghost", "amd-radeon")
     class Bad:
         async def chat(self, body, model):
@@ -98,8 +103,9 @@ def test_model_not_found_removal(env):
     assert "ghost" in reg.get_removed_ids()
 
 
-def test_sticky_session(env):
+def test_sticky_session(env, keyless):
     cfg, reg, quota = env
+    keyless(cfg, "amd-radeon")
     r = Router(cfg, reg, quota, {"amd-radeon": MockProv("amd")})
     asyncio.run(r.route({"messages": [{"role": "user", "content": "1"}]}))
     sticky = r.session.get_sticky()

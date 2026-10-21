@@ -1,3 +1,6 @@
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """运行时覆盖层（P1）：把“动态增删的提供商/模型”写进独立文件，不动 config.yaml。
 
 好处：config.yaml 仍可手工维护注释；运行期改动落在

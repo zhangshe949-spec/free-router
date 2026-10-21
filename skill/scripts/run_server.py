@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """Free-Router 无窗口启动入口（供 pythonw + 计划任务调用）。
 自包含：内部 chdir + sys.path，不依赖调用方工作目录。"""
 import os

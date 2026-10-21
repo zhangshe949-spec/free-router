@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 zhangshe949-spec. All rights reserved.
+# Proprietary software - see LICENSE. Unauthorized copying, redistribution
+# or commercial use of this file, via any medium, is strictly prohibited.
 """Free-Router 额度守护进程：周期探测额度/冷却，额度耗尽自动轮换模型。
 配合 FreeRide-H 的 mid-task 切换思想，下次调用自动反映新模型。"""
 import asyncio
