@@ -39,6 +39,27 @@ class Registry:
         self.disabled = set(getattr(cfg, "disabled_models", set()) or set())
         self._init_db()
         self._load_static_models(cfg)
+        # 添加虚拟聚合模型 free-router：用于统一入口，路由器内部自动选择最佳免费模型
+        self._add_virtual_aggregator()
+
+    def _add_virtual_aggregator(self):
+        """添加虚拟聚合模型 free-router，不属于任何具体 provider，仅作为路由入口"""
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        if "free-router" not in self._models:
+            entry = ModelEntry(
+                id="free-router",
+                provider="free-router",  # 虚拟 provider
+                capability={"score": 100, "code": 100, "reason": 100, "long": 100, "vision": False},
+                tier="high",
+                status="active",
+                discovered_at=now,
+                updated_at=now,
+                type="free",
+                tags=["aggregator", "auto-routing"],
+                priority=1000,  # 最高优先级，但在路由时会被特殊处理
+            )
+            self._models[entry.id] = entry
+            self._upsert(entry)
 
     def _init_db(self):
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

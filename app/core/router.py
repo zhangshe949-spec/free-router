@@ -212,6 +212,12 @@ class Router:
             ctx.setdefault("tenant", tenant)
         tenant = str(ctx.get("tenant") or DEFAULT_TENANT)
 
+        # 特殊处理：model="free-router" 表示自动路由模式，不指定具体模型
+        explicit_model = body.get("model")
+        if isinstance(explicit_model, str) and explicit_model == "free-router":
+            # 清除显式模型，让路由器自动选择最佳免费模型
+            body["model"] = None
+
         attempted = []          # 本次请求失败的提供商（用于 fallback 指标）
         notice = None
 

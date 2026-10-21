@@ -168,8 +168,14 @@ def _attach_meta(payload: dict, meta: dict) -> dict:
 # ---------- OpenAI 兼容端点 ----------
 @app.get("/v1/models")
 async def list_models():
-    """OpenAI 兼容：列出可用模型（自动发现后的注册表）"""
-    models = app_state["registry"].list_active()
+    """OpenAI 兼容：列出可用模型（仅返回虚拟聚合模型 free-router）"""
+    # 只暴露 free-router 聚合模型，隐藏所有具体的下游模型
+    aggregator = app_state["registry"].get("free-router")
+    if aggregator and aggregator.status == "active":
+        models = [aggregator]
+    else:
+        # 兜底：如果聚合模型不存在，返回空列表
+        models = []
     return {
         "object": "list",
         "data": [
